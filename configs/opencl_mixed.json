@@ -1,0 +1,26 @@
+{
+  "profile": "mixed",
+  "api": "opencl",
+  "mode": "compute",
+
+  "width": 1280,
+  "height": 720,
+  "rt_format": "RGBA8",
+
+  "duration": 10,
+  "warmup": 1,
+  "timeout": 30,
+
+  "shader": "mixed",
+  "iterations": 256,
+  "texture_count": 4,
+
+  "verify_mode": "none",
+  "checksum_interval": 30,
+
+  "gpu_timestamp": true,
+  "gpu_timeout_ms": 5000,
+
+  "heartbeat_interval": 1,
+  "output_format": "jsonl"
+}
