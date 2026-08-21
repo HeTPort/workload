@@ -1,0 +1,32 @@
+{
+  "profile": "game_mid",
+  "api": "null",
+  "mode": "offscreen",
+
+  "width": 1920,
+  "height": 1080,
+  "rt_format": "RGBA8",
+  "samples": 1,
+
+  "duration": 10,
+  "frames": 0,
+  "warmup": 2,
+  "timeout": 20,
+
+  "shader": "mixed",
+  "complexity": "medium",
+  "iterations": 192,
+  "texture_count": 4,
+  "texture_size": "2048x2048",
+  "duty_cycle": 1.0,
+
+  "verify_mode": "none",
+  "checksum_interval": 60,
+
+  "gpu_timestamp": true,
+  "timestamp_scope": "frame",
+  "gpu_timeout_ms": 5000,
+
+  "heartbeat_interval": 1,
+  "output_format": "jsonl"
+}
