@@ -1,0 +1,19 @@
+{
+  "profile": "burst",
+  "api": "cpu",
+  "mode": "compute",
+  "backend": "mixed",
+  "duration": 30,
+  "warmup": 2,
+  "timeout": 45,
+  "iterations": 100000,
+  "threads": 1,
+  "working_set_kb": 256,
+  "duty_cycle": 0.5,
+  "burst_period": 2,
+  "burst_active": 1,
+  "verify_mode": "checksum",
+  "checksum_interval": 60,
+  "heartbeat_interval": 1,
+  "output_format": "jsonl"
+}
