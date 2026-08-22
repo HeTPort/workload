@@ -1,5 +1,7 @@
 # CPU AVS Workload User Manual
 
+Unless a command says otherwise, run it from the repository's `cpuworkload` directory.
+
 ## 1. Overview
 
 `cpu-avs-workload` generates deterministic CPU load for AVS, voltage/frequency, power, thermal, and stability evaluation. It is designed for an external monitoring tool but can also run manually.

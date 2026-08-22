@@ -4,7 +4,7 @@
 
 `cpu-avs-workload` is a portable, deterministic CPU loading and health-check tool for AVS low-power evaluation. It follows the existing GPU workload's factory/backend organization and preserves the monitoring-facing JSONL lifecycle while replacing GPU API work with CPU computation batches.
 
-The CPU tool is additive. The original GPU source, shaders, and configurations remain untouched.
+The CPU tool is additive. The original GPU source, shaders, and configurations remain untouched in the sibling `gpuworkload/` directory.
 
 ## 2. Design objectives
 
@@ -20,7 +20,13 @@ The CPU tool is additive. The original GPU source, shaders, and configurations r
 ## 3. Project structure
 
 ```text
-cpu/
+cpuworkload/
+├── CMakeLists.txt
+├── CMakePresets.json
+├── build.ps1
+├── build.sh
+├── configs/
+├── docs/
 ├── include/cpu_avs/
 │   ├── backend.h
 │   ├── config.h
@@ -53,7 +59,7 @@ cpu/
 │       ├── matrix/
 │       ├── memory/
 │       └── mixed/
-└── CMakeLists.txt
+└── tests/
 ```
 
 The common-file inventory mirrors the GPU implementation. CPU backends replace the GPU API backends; shader assets, graphics contexts, and shader loaders have no CPU counterpart.

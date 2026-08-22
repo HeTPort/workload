@@ -1,22 +1,24 @@
-# CPU AVS Workload
+# AVS Workloads
 
-This repository now contains an additive portable CPU workload under `cpu/`, alongside the original GPU benchmark sources. The CPU tool provides deterministic integer, floating-point, matrix, memory, mixed, and idle backends with GPU-compatible JSONL monitoring events.
+This repository contains separate GPU and CPU workload projects for AVS low-power evaluation. The GPU implementation is retained unchanged under `gpuworkload/`; the portable CPU implementation and all of its build, configuration, test, and documentation files are under `cpuworkload/`.
 
-Quick desktop build on Windows:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\build.ps1 -Target desktop -Configuration Release
-.\build\desktop-release\cpu-avs-workload.exe --config .\configs\cpu_mixed.json
+```text
+.
+├── gpuworkload/
+│   ├── configs/       # GPU workload profiles
+│   ├── include/       # gpu_avs public/common headers
+│   ├── shaders/       # GLES, OpenCL, and Vulkan programs
+│   └── src/           # GPU runner and API backends
+└── cpuworkload/
+    ├── configs/       # CPU workload profiles
+    ├── docs/          # CPU design and user manual
+    ├── include/       # cpu_avs public/common headers
+    ├── src/           # CPU runner and compute backends
+    ├── tests/         # CPU smoke tests
+    ├── CMakeLists.txt
+    ├── CMakePresets.json
+    ├── build.ps1
+    └── build.sh
 ```
 
-Documentation:
-
-- [Design](docs/design.md)
-- [User manual](docs/user_manual.md)
-
-Automated smoke test:
-
-```powershell
-.\tests\smoke.ps1 -Executable .\build\desktop-release\cpu-avs-workload.exe
-```
+For CPU build and usage instructions, see [cpuworkload/README.md](cpuworkload/README.md) and the [CPU user manual](cpuworkload/docs/user_manual.md).

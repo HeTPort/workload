@@ -29,23 +29,23 @@ if ($Target -eq "desktop" -and -not $CMake) {
 
     New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
     $Sources = @(
-        "cpu/src/main.cpp",
-        "cpu/src/backend_factory.cpp",
-        "cpu/src/config.cpp",
-        "cpu/src/crc32.cpp",
-        "cpu/src/heartbeat.cpp",
-        "cpu/src/logger.cpp",
-        "cpu/src/metrics.cpp",
-        "cpu/src/profile.cpp",
-        "cpu/src/runner.cpp",
-        "cpu/src/utils.cpp",
-        "cpu/src/verifier.cpp",
-        "cpu/src/backends/null/null_backend.cpp",
-        "cpu/src/backends/integer/integer_backend.cpp",
-        "cpu/src/backends/floating_point/floating_point_backend.cpp",
-        "cpu/src/backends/matrix/matrix_backend.cpp",
-        "cpu/src/backends/memory/memory_backend.cpp",
-        "cpu/src/backends/mixed/mixed_backend.cpp"
+        "src/main.cpp",
+        "src/backend_factory.cpp",
+        "src/config.cpp",
+        "src/crc32.cpp",
+        "src/heartbeat.cpp",
+        "src/logger.cpp",
+        "src/metrics.cpp",
+        "src/profile.cpp",
+        "src/runner.cpp",
+        "src/utils.cpp",
+        "src/verifier.cpp",
+        "src/backends/null/null_backend.cpp",
+        "src/backends/integer/integer_backend.cpp",
+        "src/backends/floating_point/floating_point_backend.cpp",
+        "src/backends/matrix/matrix_backend.cpp",
+        "src/backends/memory/memory_backend.cpp",
+        "src/backends/mixed/mixed_backend.cpp"
     ) | ForEach-Object { Join-Path $ProjectRoot $_ }
 
     $Output = Join-Path $BuildDirectory "cpu-avs-workload.exe"
@@ -53,8 +53,8 @@ if ($Target -eq "desktop" -and -not $CMake) {
     $Arguments = @(
         "-std=c++17", $Optimization, "-Wall", "-Wextra", "-Wpedantic",
         "-static-libgcc", "-static-libstdc++",
-        "-I", (Join-Path $ProjectRoot "cpu/include"),
-        "-I", (Join-Path $ProjectRoot "cpu/src"),
+        "-I", (Join-Path $ProjectRoot "include"),
+        "-I", (Join-Path $ProjectRoot "src"),
         "-o", $Output
     ) + $Sources
 

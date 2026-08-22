@@ -1,0 +1,11 @@
+gpuworkload/** -text
+gpuworkload/configs/game_mid_1080p text eol=crlf
+gpuworkload/include/gpu_avs/backend.h text eol=crlf
+gpuworkload/shaders/gles/alu.frag text eol=crlf
+gpuworkload/shaders/opencl/workload.cl text eol=crlf
+gpuworkload/shaders/vulkan/workload.frag text eol=crlf
+gpuworkload/src/backends/gles/gles_backend.h text eol=crlf
+gpuworkload/src/backends/null/null_backend.cpp text eol=crlf
+gpuworkload/src/backends/opencl/opencl_backend.h text eol=crlf
+gpuworkload/src/backends/vulkan/vulkan_backend.h text eol=crlf
+gpuworkload/src/config.cpp text eol=crlf
