@@ -1,5 +1,7 @@
 #include "gpu_avs/runner.h"
 
+#include "avs/verify_schedule.h"
+
 #include "gpu_avs/backend.h"
 #include "gpu_avs/heartbeat.h"
 #include "gpu_avs/logger.h"
@@ -457,7 +459,9 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
     uint64_t device_lost_count = 0;
     uint64_t allocation_fail_count = 0;
 
+    uint64_t verify_count = 0;
     uint64_t verify_fail_count = 0;
+    uint64_t successful_verify_count = 0;
     int64_t first_fail_frame = -1;
     uint64_t pixel_diff_count = 0;
     uint64_t compute_mismatch_count = 0;
@@ -567,8 +571,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         const uint64_t completed_frame = frame_index + 1;
 
         if (verifier.Enabled() &&
-            cfg.checksum_interval > 0 &&
-            completed_frame % cfg.checksum_interval == 0) {
+            avs::ShouldVerify(completed_frame, cfg.verify_interval)) {
             ReadbackBuffer rb;
 
             if (!backend->Readback(rb, error)) {
@@ -600,19 +603,26 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
             }
 
             VerifyResult vr = verifier.Verify(rb, completed_frame);
+            ++verify_count;
             last_checksum = vr.checksum;
+            if (vr.pass) {
+                ++successful_verify_count;
+            }
 
-            logger.EmitVerify(
-                completed_frame,
-                vr.verify_mode,
-                vr.checksum,
-                vr.golden_checksum,
-                vr.pass,
-                vr.mismatch_count,
-                vr.pixel_diff_count,
-                vr.compute_mismatch_count,
-                vr.message
-            );
+            if (!vr.pass || avs::ShouldLogSuccessfulVerify(
+                    successful_verify_count, cfg.success_log_interval)) {
+                logger.EmitVerify(
+                    completed_frame,
+                    vr.verify_mode,
+                    vr.checksum,
+                    vr.golden_checksum,
+                    vr.pass,
+                    vr.mismatch_count,
+                    vr.pixel_diff_count,
+                    vr.compute_mismatch_count,
+                    vr.message
+                );
+            }
 
             if (!vr.pass) {
                 verify_fail_count++;
@@ -684,6 +694,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
 
     summary.verify_pass = verify_fail_count == 0;
     summary.verify_mode = cfg.verify_mode;
+    summary.verify_count = verify_count;
     summary.verify_fail_count = verify_fail_count;
     summary.first_fail_frame = first_fail_frame;
     summary.checksum = last_checksum;

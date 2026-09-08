@@ -72,7 +72,10 @@ void Logger::EmitStart(const WorkloadConfig& cfg) {
        << "\"height\":" << cfg.height << ","
        << "\"rt_format\":\"" << JsonEscape(cfg.rt_format) << "\","
        << "\"duration_s\":" << cfg.duration_s << ","
-       << "\"warmup_s\":" << cfg.warmup_s
+       << "\"warmup_s\":" << cfg.warmup_s << ","
+       << "\"verify_mode\":\"" << JsonEscape(cfg.verify_mode) << "\","
+       << "\"verify_interval\":" << cfg.verify_interval << ","
+       << "\"success_log_interval\":" << cfg.success_log_interval
        << "}";
 
     WriteLine(os.str());
@@ -221,6 +224,9 @@ void Logger::EmitSummary(const SummaryData& s) {
 
        << "\"verify_pass\":" << (s.verify_pass ? "true" : "false") << ","
        << "\"verify_mode\":\"" << JsonEscape(s.verify_mode) << "\","
+       << "\"verify_interval\":" << s.config.verify_interval << ","
+       << "\"success_log_interval\":" << s.config.success_log_interval << ","
+       << "\"verify_count\":" << s.verify_count << ","
        << "\"verify_fail_count\":" << s.verify_fail_count << ","
        << "\"first_fail_frame\":" << s.first_fail_frame << ","
        << "\"checksum\":\"" << JsonEscape(s.checksum) << "\","

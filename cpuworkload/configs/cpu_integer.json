@@ -10,7 +10,8 @@
   "threads": 1,
   "working_set_kb": 64,
   "verify_mode": "checksum",
-  "checksum_interval": 60,
+  "verify_interval": 1,
+  "success_log_interval": 60,
   "heartbeat_interval": 1,
   "output_format": "jsonl"
 }

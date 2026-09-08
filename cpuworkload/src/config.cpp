@@ -130,7 +130,9 @@ bool ApplyKeyValue(WorkloadConfig& cfg, const std::string& key, const std::strin
     else if (key == "burst-active" || key == "burst_active") cfg.burst_active_s = ToDouble(value);
 
     else if (key == "verify-mode" || key == "verify_mode") cfg.verify_mode = value;
-    else if (key == "checksum-interval" || key == "checksum_interval") cfg.checksum_interval = ToU32(value);
+    else if (key == "verify-interval" || key == "verify_interval" ||
+             key == "checksum-interval" || key == "checksum_interval") cfg.verify_interval = ToU32(value);
+    else if (key == "success-log-interval" || key == "success_log_interval") cfg.success_log_interval = ToU32(value);
     else if (key == "golden-checksum" || key == "golden_checksum") cfg.golden_checksum = value;
     else if (key == "fail-fast" || key == "fail_fast") ApplyBool(cfg.fail_fast, value);
     else if (key == "generate-golden" || key == "generate_golden") ApplyBool(cfg.generate_golden, value);
@@ -256,6 +258,10 @@ bool ValidateConfig(const WorkloadConfig& cfg, std::string& error) {
         error = "unsupported verify mode: " + cfg.verify_mode;
         return false;
     }
+    if (cfg.verify_mode != "none" && cfg.verify_interval == 0) {
+        error = "verify-interval must be positive when verification is enabled";
+        return false;
+    }
     if (!cfg.golden_checksum.empty()) {
         std::string checksum = cfg.golden_checksum;
         if (checksum.rfind("0x", 0) == 0 || checksum.rfind("0X", 0) == 0) checksum.erase(0, 2);
@@ -345,7 +351,8 @@ void DumpEffectiveConfig(const WorkloadConfig& cfg) {
               << "\"burst_period_s\":" << cfg.burst_period_s << ','
               << "\"burst_active_s\":" << cfg.burst_active_s << ','
               << "\"verify_mode\":\"" << JsonEscape(cfg.verify_mode) << "\","
-              << "\"checksum_interval\":" << cfg.checksum_interval << ','
+              << "\"verify_interval\":" << cfg.verify_interval << ','
+              << "\"success_log_interval\":" << cfg.success_log_interval << ','
               << "\"batch_timeout_ms\":" << cfg.batch_timeout_ms << ','
               << "\"heartbeat_interval_s\":" << cfg.heartbeat_interval_s << ','
               << "\"output_format\":\"" << JsonEscape(cfg.output_format) << "\","
@@ -389,7 +396,9 @@ Runtime:
 
 Verification:
   --verify-mode <none|checksum|crc>
-  --checksum-interval <batches>
+  --verify-interval <batches>    Work units between actual checks
+  --success-log-interval <N>     Successful checks between verify logs; 0 suppresses them
+  --checksum-interval <batches>  Deprecated alias for --verify-interval
   --golden-checksum <hex>
   --fail-fast <bool>
   --generate-golden[=<bool>]

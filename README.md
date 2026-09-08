@@ -1,6 +1,6 @@
 # AVS Workloads
 
-This repository contains separate GPU and CPU workload projects for AVS low-power evaluation. The GPU implementation is retained unchanged under `gpuworkload/`; the portable CPU implementation and all of its build, configuration, test, and documentation files are under `cpuworkload/`.
+This repository contains separate GPU and CPU workload projects for AVS low-power evaluation. Both projects implement the same verification cadence and success-log contract described in [VERIFY_CONTRACT.md](VERIFY_CONTRACT.md). The portable CPU implementation and its build, configuration, test, and documentation files are under `cpuworkload/`; the GPU implementation is under `gpuworkload/`.
 
 ```text
 .
@@ -22,3 +22,9 @@ This repository contains separate GPU and CPU workload projects for AVS low-powe
 ```
 
 For CPU build and usage instructions, see [cpuworkload/README.md](cpuworkload/README.md) and the [CPU user manual](cpuworkload/docs/user_manual.md).
+
+The portable verification-contract tests can be run with:
+
+```powershell
+.\tests\test_verify_contract.ps1
+```

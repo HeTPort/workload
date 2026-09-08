@@ -174,7 +174,9 @@ static bool ApplyKeyValue(
     else if (key == "burst-active" || key == "burst_active") cfg.burst_active_s = ToDouble(value);
 
     else if (key == "verify-mode" || key == "verify_mode") cfg.verify_mode = value;
-    else if (key == "checksum-interval" || key == "checksum_interval") cfg.checksum_interval = ToU32(value);
+    else if (key == "verify-interval" || key == "verify_interval" ||
+             key == "checksum-interval" || key == "checksum_interval") cfg.verify_interval = ToU32(value);
+    else if (key == "success-log-interval" || key == "success_log_interval") cfg.success_log_interval = ToU32(value);
     else if (key == "golden-checksum" || key == "golden_checksum") cfg.golden_checksum = value;
     else if (key == "golden-file" || key == "golden_file") cfg.golden_file = value;
     else if (key == "pixel-threshold" || key == "pixel_threshold") cfg.pixel_threshold = ToDouble(value);
@@ -329,6 +331,11 @@ bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& e
         effective.timeout_s = effective.warmup_s + effective.duration_s + 30.0;
     }
 
+    if (effective.verify_mode != "none" && effective.verify_interval == 0) {
+        error = "verify-interval must be positive when verification is enabled";
+        return false;
+    }
+
     cfg = effective;
     return true;
 }
@@ -372,7 +379,9 @@ Load:
 
 Verify:
   --verify-mode <none|crc|checksum|golden-image|pixel-diff|compute-compare>
-  --checksum-interval <N>
+  --verify-interval <frames>     Work units between actual checks
+  --success-log-interval <N>     Successful checks between verify logs; 0 suppresses them
+  --checksum-interval <frames>   Deprecated alias for --verify-interval
   --golden-checksum <hex>
   --golden-file <path>
   --pixel-threshold <value>

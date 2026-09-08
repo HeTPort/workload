@@ -85,6 +85,9 @@ void Logger::EmitStart(const WorkloadConfig& cfg) {
        << "\"iterations\":" << cfg.iterations << ','
        << "\"threads\":" << cfg.threads << ','
        << "\"working_set_kb\":" << cfg.working_set_kb << ','
+       << "\"verify_mode\":\"" << JsonEscape(cfg.verify_mode) << "\","
+       << "\"verify_interval\":" << cfg.verify_interval << ','
+       << "\"success_log_interval\":" << cfg.success_log_interval << ','
        << "\"seed\":" << cfg.seed
        << "}";
     WriteLine(os.str());
@@ -203,6 +206,9 @@ void Logger::EmitSummary(const SummaryData& summary) {
 
     os << "\"verify_pass\":" << (summary.verify_pass ? "true" : "false") << ','
        << "\"verify_mode\":\"" << JsonEscape(summary.config.verify_mode) << "\","
+       << "\"verify_interval\":" << summary.config.verify_interval << ','
+       << "\"success_log_interval\":" << summary.config.success_log_interval << ','
+       << "\"verify_count\":" << summary.verify_count << ','
        << "\"verify_fail_count\":" << summary.verify_fail_count << ','
        << "\"first_fail_batch\":" << summary.first_fail_batch << ','
        << "\"first_fail_frame\":" << summary.first_fail_batch << ','

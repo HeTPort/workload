@@ -1,5 +1,7 @@
 #include "cpu_avs/runner.h"
 
+#include "avs/verify_schedule.h"
+
 #include "cpu_avs/backend.h"
 #include "cpu_avs/crc32.h"
 #include "cpu_avs/heartbeat.h"
@@ -162,6 +164,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
     Heartbeat heartbeat(cfg.heartbeat_interval_s);
     uint64_t batch_count = 0;
     uint64_t operation_count = 0;
+    uint64_t verify_count = 0;
     uint64_t verify_fail_count = 0;
     uint64_t worker_error_count = 0;
     uint64_t timeout_count = 0;
@@ -175,6 +178,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
     ResultCode final_result = ResultCode::PASS;
     const double run_start = NowSeconds();
 
+    uint64_t successful_verify_count = 0;
     while (true) {
         const double now = NowSeconds();
         const double run_elapsed = now - run_start;
@@ -234,10 +238,14 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         last_checksum = verifier.ComputeChecksum(batch);
         logger.EmitBatch(batch_count, batch.operation_count, last_batch_ms, last_checksum);
 
-        if (verifier.Enabled()) {
+        if (verifier.Enabled() && avs::ShouldVerify(batch_count, cfg.verify_interval)) {
             const VerifyResult verification = verifier.Verify(batch, backend->ExpectedChecksum(), batch_count);
-            const bool emit_verify = !verification.pass ||
-                (cfg.checksum_interval > 0 && batch_count % cfg.checksum_interval == 0);
+            ++verify_count;
+            if (verification.pass) {
+                ++successful_verify_count;
+            }
+            const bool emit_verify = !verification.pass || avs::ShouldLogSuccessfulVerify(
+                successful_verify_count, cfg.success_log_interval);
             if (emit_verify) {
                 VerifyData data;
                 data.batch = verification.batch;
@@ -287,6 +295,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         summary.throughput = MetricsCollector::ComputeStats({summary.operations_per_sec_avg});
     }
     summary.verify_pass = verify_fail_count == 0;
+    summary.verify_count = verify_count;
     summary.verify_fail_count = verify_fail_count;
     summary.first_fail_batch = first_fail_batch;
     summary.checksum = last_checksum;

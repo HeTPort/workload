@@ -33,6 +33,7 @@ struct SummaryData {
 
     bool verify_pass = true;
     std::string verify_mode = "none";
+    uint64_t verify_count = 0;
     uint64_t verify_fail_count = 0;
     int64_t first_fail_frame = -1;
     std::string checksum;

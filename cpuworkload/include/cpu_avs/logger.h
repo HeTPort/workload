@@ -50,6 +50,7 @@ struct SummaryData {
     StatSummary throughput;
 
     bool verify_pass = true;
+    uint64_t verify_count = 0;
     uint64_t verify_fail_count = 0;
     int64_t first_fail_batch = -1;
     std::string checksum;

@@ -32,7 +32,8 @@ struct WorkloadConfig {
     double burst_active_s = 1.0;
 
     std::string verify_mode = "none";
-    uint32_t checksum_interval = 60;
+    uint32_t verify_interval = 1;
+    uint32_t success_log_interval = 60;
     std::string golden_checksum;
     std::string golden_file;
     double pixel_threshold = 0.0;
