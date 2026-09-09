@@ -17,6 +17,20 @@ constexpr bool ShouldLogSuccessfulVerify(
            (successful_verify_index - 1) % success_log_interval == 0;
 }
 
+// Diagnostic success events must not scale without bound with throughput.
+class SuccessLogRateLimit {
+public:
+    bool Allow(uint64_t now_ms) {
+        if (emitted_ && (now_ms < last_ms_ || now_ms - last_ms_ < 1000)) return false;
+        emitted_ = true;
+        last_ms_ = now_ms;
+        return true;
+    }
+private:
+    bool emitted_ = false;
+    uint64_t last_ms_ = 0;
+};
+
 static_assert(ShouldVerify(1, 1));
 static_assert(!ShouldVerify(1, 2));
 static_assert(ShouldVerify(2, 2));

@@ -63,6 +63,7 @@ struct WorkloadConfig {
     bool dump_effective_config = false;
     bool show_help = false;
     bool show_version = false;
+    bool show_capabilities = false;
 };
 
 bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& error);
@@ -71,5 +72,6 @@ bool ValidateConfig(const WorkloadConfig& cfg, std::string& error);
 void DumpEffectiveConfig(const WorkloadConfig& cfg);
 void PrintHelp();
 void PrintVersion();
+void PrintCapabilities();
 
 } // namespace cpu_avs

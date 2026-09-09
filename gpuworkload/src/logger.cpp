@@ -1,4 +1,5 @@
 #include "gpu_avs/logger.h"
+#include "gpu_avs/utils.h"
 
 #include <iomanip>
 #include <iostream>
@@ -65,6 +66,7 @@ void Logger::EmitStart(const WorkloadConfig& cfg) {
     std::ostringstream os;
     os << "{"
        << "\"type\":\"start\","
+       << "\"contract_version\":2,"
        << "\"profile\":\"" << JsonEscape(cfg.profile) << "\","
        << "\"api\":\"" << JsonEscape(cfg.api) << "\","
        << "\"mode\":\"" << JsonEscape(cfg.mode) << "\","
@@ -92,10 +94,6 @@ void Logger::EmitHeartbeat(
 ) {
     last_heartbeat_time_ms_ = timestamp_ms;
 
-    if (cfg_.summary_only) {
-        return;
-    }
-
     std::ostringstream os;
     os << "{"
        << "\"type\":\"heartbeat\","
@@ -122,7 +120,8 @@ void Logger::EmitVerify(
     uint64_t compute_mismatch_count,
     const std::string& message
 ) {
-    if (cfg_.summary_only) {
+    if (pass && (cfg_.summary_only || cfg_.success_log_interval == 0 ||
+                 !success_log_rate_limit_.Allow(NowMs()))) {
         return;
     }
 
@@ -134,6 +133,7 @@ void Logger::EmitVerify(
        << "\"checksum\":\"" << JsonEscape(checksum) << "\","
        << "\"golden_checksum\":\"" << JsonEscape(golden_checksum) << "\","
        << "\"result\":\"" << (pass ? "PASS" : "FAIL") << "\","
+       << "\"pass\":" << (pass ? "true" : "false") << ","
        << "\"mismatch_count\":" << mismatch_count << ","
        << "\"pixel_diff_count\":" << pixel_diff_count << ","
        << "\"compute_mismatch_count\":" << compute_mismatch_count << ","
@@ -191,6 +191,7 @@ void Logger::EmitSummary(const SummaryData& s) {
 
     os << "{"
        << "\"type\":\"summary\","
+       << "\"contract_version\":2,"
        << "\"result\":\"" << ResultToString(s.result) << "\","
        << "\"exit_code\":" << s.exit_code << ","
 

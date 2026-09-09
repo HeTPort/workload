@@ -96,6 +96,10 @@ int main(int argc, char** argv) {
         PrintVersion();
         return 0;
     }
+    if (cfg.show_capabilities) {
+        PrintCapabilities();
+        return 0;
+    }
 
     if (cfg.list_profiles) {
         PrintProfiles();

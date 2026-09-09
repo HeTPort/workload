@@ -1,4 +1,5 @@
 #include "cpu_avs/logger.h"
+#include "cpu_avs/utils.h"
 
 #include <iomanip>
 #include <iostream>
@@ -74,6 +75,7 @@ void Logger::EmitStart(const WorkloadConfig& cfg) {
     std::ostringstream os;
     os << "{"
        << "\"type\":\"start\","
+       << "\"contract_version\":2,"
        << "\"schema_version\":1,"
        << "\"workload\":\"cpu\","
        << "\"profile\":\"" << JsonEscape(cfg.profile) << "\","
@@ -95,7 +97,6 @@ void Logger::EmitStart(const WorkloadConfig& cfg) {
 
 void Logger::EmitHeartbeat(const HeartbeatData& data) {
     last_heartbeat_time_ms_ = data.timestamp_ms;
-    if (cfg_.summary_only) return;
     std::ostringstream os;
     os << std::fixed << std::setprecision(4)
        << "{"
@@ -135,7 +136,8 @@ void Logger::EmitBatch(uint64_t batch, uint64_t operations, double time_ms,
 }
 
 void Logger::EmitVerify(const VerifyData& data) {
-    if (cfg_.summary_only) return;
+    if (data.pass && (cfg_.summary_only || cfg_.success_log_interval == 0 ||
+                      !success_log_rate_limit_.Allow(NowMs()))) return;
     std::ostringstream os;
     os << "{\"type\":\"verify\","
        << "\"batch\":" << data.batch << ','
@@ -144,6 +146,7 @@ void Logger::EmitVerify(const VerifyData& data) {
        << "\"checksum\":\"" << JsonEscape(data.checksum) << "\","
        << "\"golden_checksum\":\"" << JsonEscape(data.golden_checksum) << "\","
        << "\"result\":\"" << (data.pass ? "PASS" : "FAIL") << "\","
+       << "\"pass\":" << (data.pass ? "true" : "false") << ','
        << "\"mismatch_count\":" << data.mismatch_count << ','
        << "\"pixel_diff_count\":0,"
        << "\"compute_mismatch_count\":" << data.mismatch_count << ','
@@ -182,6 +185,7 @@ void Logger::EmitSummary(const SummaryData& summary) {
     std::ostringstream os;
     os << std::fixed << std::setprecision(4)
        << "{\"type\":\"summary\","
+       << "\"contract_version\":2,"
        << "\"schema_version\":1,"
        << "\"workload\":\"cpu\","
        << "\"result\":\"" << ResultToString(summary.result) << "\","

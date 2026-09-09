@@ -88,8 +88,8 @@ $CadenceRecords = @(Get-Content -LiteralPath $VerifyCadencePath |
     ForEach-Object { $_ | ConvertFrom-Json })
 $VerifyRecords = @($CadenceRecords | Where-Object { $_.type -eq "verify" })
 $VerifyBatches = @($VerifyRecords | ForEach-Object { [int]$_.batch })
-if (($VerifyBatches -join ",") -ne "1,3,5") {
-    throw "verify-cadence emitted batches [$($VerifyBatches -join ',')]; expected [1,3,5]"
+if ($VerifyBatches.Count -lt 1 -or $VerifyBatches[0] -ne 1 -or @($VerifyBatches | Where-Object { $_ -notin @(1,3,5) }).Count) {
+    throw "verify-cadence emitted invalid sampled batches [$($VerifyBatches -join ',')]; rate cap may omit candidates after batch 1"
 }
 if ([int]$CadenceRecords[-1].verify_count -ne 5) {
     throw "verify-cadence summary reported verify_count=$($CadenceRecords[-1].verify_count); expected 5"
@@ -105,11 +105,11 @@ $AllIntervalRecords = @(Get-Content -LiteralPath $VerifyIntervalPath |
     ForEach-Object { $_ | ConvertFrom-Json })
 $IntervalRecords = @($AllIntervalRecords | Where-Object { $_.type -eq "verify" })
 $IntervalBatches = @($IntervalRecords | ForEach-Object { [int]$_.batch })
-if (($IntervalBatches -join ",") -ne "2,4") {
-    throw "verify-interval emitted batches [$($IntervalBatches -join ',')]; expected [2,4]"
+if ($IntervalBatches.Count -lt 1 -or $IntervalBatches[0] -ne 2 -or @($IntervalBatches | Where-Object { $_ -notin @(2,4) }).Count) {
+    throw "verify-interval emitted invalid sampled batches [$($IntervalBatches -join ',')]; first check must be batch 2"
 }
-if ([int]$IntervalRecords.Count -ne 2) {
-    throw "verify-interval emitted $($IntervalRecords.Count) verify events; expected 2"
+if ([int]$IntervalRecords.Count -gt 2) {
+    throw "verify-interval emitted too many verify events: $($IntervalRecords.Count)"
 }
 if ([int]$AllIntervalRecords[-1].verify_count -ne 2) {
     throw "verify-interval summary reported verify_count=$($AllIntervalRecords[-1].verify_count); expected 2"

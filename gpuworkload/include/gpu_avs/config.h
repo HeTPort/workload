@@ -58,6 +58,7 @@ struct WorkloadConfig {
     bool dump_effective_config = false;
     bool show_help = false;
     bool show_version = false;
+    bool show_capabilities = false;
 };
 
 bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& error);
@@ -65,5 +66,6 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
 
 void PrintHelp();
 void PrintVersion();
+void PrintCapabilities();
 
 } // namespace gpu_avs

@@ -21,7 +21,9 @@ bool Parse(
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    assert(argc == 2);
+    const std::string fixtures = std::string(argv[1]) + "/fixtures/";
     gpu_avs::WorkloadConfig cfg;
     std::string error;
     const std::vector<std::string> args = {
@@ -43,5 +45,24 @@ int main() {
     };
     assert(Parse(legacy_args, legacy, error));
     assert(legacy.verify_interval == 7);
+    error.clear();
+    assert(!Parse({"workload", "--verify-interval", "1", "--checksum-interval", "2"}, cfg, error));
+    error.clear();
+    assert(!Parse({"workload", "--verify_interval", "1", "--verify-interval", "2"}, cfg, error));
+    error.clear();
+    assert(!Parse({"workload", "--config", fixtures + "ambiguous-interval.json"}, cfg, error));
+    error.clear();
+    assert(Parse({"workload", "--config", fixtures + "legacy-interval.json", "--verify-interval", "1"}, cfg, error));
+    assert(cfg.verify_interval == 1);
+    error.clear();
+    assert(Parse({"workload", "--config", fixtures + "canonical-interval.json", "--checksum-interval", "3"}, cfg, error));
+    assert(cfg.verify_interval == 3);
+    error.clear();
+    assert(!Parse({"workload", "--verify-mode", "checksum", "--verify-interval", "0"}, cfg, error));
+    error.clear();
+    assert(Parse({"workload", "--verify-mode", "none", "--verify-interval", "0"}, cfg, error));
+    error.clear();
+    assert(Parse({"workload", "--capabilities"}, cfg, error));
+    assert(cfg.show_capabilities);
     return 0;
 }

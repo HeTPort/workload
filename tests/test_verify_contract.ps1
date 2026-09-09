@@ -31,7 +31,7 @@ function Invoke-CompileAndRun {
     if ($LASTEXITCODE -ne 0) {
         throw "$Name compilation failed with exit code $LASTEXITCODE"
     }
-    & $Executable
+    & $Executable $PSScriptRoot
     if ($LASTEXITCODE -ne 0) {
         throw "$Name failed with exit code $LASTEXITCODE"
     }
@@ -40,6 +40,10 @@ function Invoke-CompileAndRun {
 
 try {
     $CommonFlags = @("-std=c++17", "-Wall", "-Wextra", "-Wpedantic")
+    Invoke-CompileAndRun "success-rate-limit" ($CommonFlags + @(
+        "-I", (Join-Path $RepositoryRoot "cpuworkload\include"),
+        (Join-Path $PSScriptRoot "success_rate_limit_test.cpp")
+    ))
     Invoke-CompileAndRun "cpu-verify-schedule" ($CommonFlags + @(
         "-I", (Join-Path $RepositoryRoot "cpuworkload\include"),
         (Join-Path $PSScriptRoot "verify_schedule_test.cpp")

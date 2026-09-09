@@ -1,4 +1,5 @@
 #pragma once
+#include "avs/verify_schedule.h"
 
 #include "gpu_avs/config.h"
 #include "gpu_avs/metrics.h"
@@ -112,6 +113,7 @@ private:
     std::ostream* out_ = nullptr;
     mutable std::mutex mutex_;
     uint64_t last_heartbeat_time_ms_ = 0;
+    avs::SuccessLogRateLimit success_log_rate_limit_;
 };
 
 } // namespace gpu_avs

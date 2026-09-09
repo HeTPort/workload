@@ -1,4 +1,5 @@
 #include "cpu_avs/config.h"
+#include "avs/contract.h"
 
 #include "cpu_avs/profile.h"
 #include "cpu_avs/utils.h"
@@ -23,7 +24,7 @@ bool LooksLikeOption(const std::string& value) {
 
 bool IsAlwaysFlag(const std::string& key) {
     return key == "--help" || key == "-h" || key == "--version" ||
-           key == "--list-profiles" || key == "--dump-effective-config";
+           key == "--list-profiles" || key == "--dump-effective-config" || key == "--capabilities";
 }
 
 bool IsOptionalBoolFlag(const std::string& key) {
@@ -35,8 +36,10 @@ bool IsOptionalBoolFlag(const std::string& key) {
 std::unordered_map<std::string, std::string> ParseCliMap(
     int argc, char** argv, std::string& error) {
     std::unordered_map<std::string, std::string> values;
+    bool seen_verify_interval = false;
     for (int i = 1; i < argc; ++i) {
         const std::string key = argv[i];
+        if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return {};
         if (!LooksLikeOption(key)) {
             error = "unexpected argument: " + key;
             return {};
@@ -193,6 +196,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
     std::ostringstream buffer;
     buffer << input.rdbuf();
     const std::string text = buffer.str();
+    bool seen_verify_interval = false;
     const std::regex key_value(
         "\"([A-Za-z0-9_\\-]+)\"\\s*:\\s*"
         "(\"([^\"]*)\"|true|false|null|-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)");
@@ -201,6 +205,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
         for (auto it = std::sregex_iterator(text.begin(), text.end(), key_value);
              it != std::sregex_iterator(); ++it) {
             const std::string key = (*it)[1].str();
+            if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return false;
             const std::string raw = (*it)[2].str();
             std::string value = raw;
             if (raw.size() >= 2 && raw.front() == '"' && raw.back() == '"') {
@@ -289,6 +294,10 @@ bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& e
     }
     if (cli.count("--version")) {
         cfg.show_version = true;
+        return true;
+    }
+    if (cli.count("--capabilities")) {
+        cfg.show_capabilities = true;
         return true;
     }
 
@@ -420,11 +429,16 @@ Utility:
   --dump-effective-config
   --help, -h
   --version
+  --capabilities                 JSON verification contract and supported modes
 )";
 }
 
 void PrintVersion() {
-    std::cout << "cpu-avs-workload 1.0.0\n";
+    std::cout << "cpu-avs-workload " << avs::kVersion << "\n";
+}
+
+void PrintCapabilities() {
+    std::cout << R"({"workload":"cpu","version":"2.1.0","contract_version":2,"features":["verify_interval","success_log_interval","verify_count","failure_verify","live_heartbeat","success_log_rate_limit"],"success_log_min_period_ms":1000,"verify_modes":["none","checksum","crc"]})" << '\n';
 }
 
 } // namespace cpu_avs

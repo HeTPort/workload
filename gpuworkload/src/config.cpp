@@ -1,4 +1,5 @@
 #include "gpu_avs/config.h"
+#include "avs/contract.h"
 #include "gpu_avs/profile.h"
 #include "gpu_avs/utils.h"
 
@@ -19,7 +20,7 @@ static bool IsAlwaysFlagOnlyArg(const std::string& key) {
            key == "--dump-effective-config" ||
            key == "--help" ||
            key == "-h" ||
-           key == "--version";
+           key == "--version" || key == "--capabilities";
 }
 
 static bool IsOptionalBoolFlagArg(const std::string& key) {
@@ -43,9 +44,11 @@ static std::unordered_map<std::string, std::string> ParseCliMap(
     std::string& error
 ) {
     std::unordered_map<std::string, std::string> m;
+    bool seen_verify_interval = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string key = argv[i];
+        if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return {};
 
         if (!LooksLikeOption(key)) {
             error = "unexpected argument: " + key;
@@ -209,6 +212,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
     std::stringstream ss;
     ss << in.rdbuf();
     std::string text = ss.str();
+    bool seen_verify_interval = false;
 
     std::regex kv_regex(
         "\"([A-Za-z0-9_\\-]+)\"\\s*:\\s*"
@@ -221,6 +225,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
     try {
         for (auto it = begin; it != end; ++it) {
             std::string key = (*it)[1].str();
+            if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return false;
             std::string raw = (*it)[2].str();
             std::string val = raw;
 
@@ -258,6 +263,10 @@ bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& e
 
     if (cli.count("--version")) {
         cfg.show_version = true;
+        return true;
+    }
+    if (cli.count("--capabilities")) {
+        cfg.show_capabilities = true;
         return true;
     }
 
@@ -407,11 +416,16 @@ Utility:
   --dump-effective-config
   --help
   --version
+  --capabilities                 JSON verification contract and supported modes
 )";
 }
 
 void PrintVersion() {
-    std::cout << "gpu-avs-workload version 0.5.0\n";
+    std::cout << "gpu-avs-workload " << avs::kVersion << "\n";
+}
+
+void PrintCapabilities() {
+    std::cout << R"({"workload":"gpu","version":"2.1.0","contract_version":2,"features":["verify_interval","success_log_interval","verify_count","failure_verify","live_heartbeat","success_log_rate_limit"],"success_log_min_period_ms":1000,"verify_modes":["none","crc","checksum","golden-image","pixel-diff","compute-compare"]})" << '\n';
 }
 
 } // namespace gpu_avs
