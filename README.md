@@ -8,7 +8,8 @@ This repository contains separate GPU and CPU workload projects for AVS low-powe
 │   ├── configs/       # GPU workload profiles
 │   ├── include/       # gpu_avs public/common headers
 │   ├── shaders/       # GLES, OpenCL, and Vulkan programs
-│   └── src/           # GPU runner and API backends
+│   ├── src/           # GPU runner and API backends
+│   └── CMakeLists.txt # Standalone HarmonyOS/OHOS framework build
 └── cpuworkload/
     ├── configs/       # CPU workload profiles
     ├── docs/          # CPU design and user manual
@@ -22,6 +23,11 @@ This repository contains separate GPU and CPU workload projects for AVS low-powe
 ```
 
 For CPU build and usage instructions, see [cpuworkload/README.md](cpuworkload/README.md) and the [CPU user manual](cpuworkload/docs/user_manual.md).
+
+`gpuworkload/CMakeLists.txt` formalizes the standalone build previously used by
+the HarmonyOS/OHOS framework workflow. The Android/HarmonyOS dual-framework
+integration has a separate CMake implementation; this standalone file does not
+replace it, and changes must be synchronized and validated there deliberately.
 
 The portable verification-contract tests can be run with:
 
