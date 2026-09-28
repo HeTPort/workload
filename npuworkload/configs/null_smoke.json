@@ -1,0 +1,11 @@
+{
+  "profile": "null",
+  "backend": "null",
+  "workload": "identity",
+  "duration": 0,
+  "inferences": 10,
+  "warmup_inferences": 0,
+  "input_elements": 64,
+  "output_elements": 64,
+  "verify_mode": "checksum"
+}

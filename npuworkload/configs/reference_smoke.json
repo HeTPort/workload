@@ -1,0 +1,13 @@
+{
+  "profile": "reference",
+  "backend": "reference_cpu",
+  "workload": "synthetic_dense",
+  "duration": 0,
+  "inferences": 10,
+  "warmup_inferences": 1,
+  "input_elements": 64,
+  "output_elements": 12,
+  "verify_mode": "checksum",
+  "verify_interval": 1,
+  "heartbeat_interval": 1.0
+}
