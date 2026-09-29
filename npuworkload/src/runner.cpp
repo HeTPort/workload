@@ -3,10 +3,14 @@
 #include "npu_avs/backend.h"
 #include "npu_avs/heartbeat.h"
 #include "npu_avs/logger.h"
+#include "npu_avs/manifest.h"
 #include "npu_avs/metrics.h"
+#include "npu_avs/profile.h"
 #include "npu_avs/utils.h"
 #include "npu_avs/verifier.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -22,37 +26,37 @@ bool StopConditionReached(const WorkloadConfig& cfg, uint64_t count, double elap
     return cfg.inferences > 0 ? count_reached : duration_reached;
 }
 
-TensorBuffer BuildInput(const WorkloadConfig& cfg) {
-    TensorBuffer input;
-    input.name = "synthetic_input";
-    input.data_type = TensorDataType::Int8;
-    input.shape = {1U, cfg.input_elements};
-    input.scale = 1.0F / 32.0F;
-    input.zero_point = 0;
-    input.data.resize(cfg.input_elements);
-    uint64_t state = cfg.seed;
-    for (uint32_t i = 0; i < cfg.input_elements; ++i) {
-        state ^= state >> 12U;
-        state ^= state << 25U;
-        state ^= state >> 27U;
-        state *= 2685821657736338717ULL;
-        const int8_t value = static_cast<int8_t>(static_cast<int32_t>(state % 255U) - 127);
-        input.data[i] = static_cast<uint8_t>(value);
-    }
-    return input;
+uint32_t EffectiveInferenceTimeoutMs(const WorkloadConfig& cfg, double total_start) {
+    const double remaining_s = cfg.timeout_s - (NowSeconds() - total_start);
+    if (remaining_s <= 0.0) return 0;
+    const double remaining_ms = std::ceil(remaining_s * 1000.0);
+    const double bounded_ms = std::min<double>(remaining_ms, cfg.inference_timeout_ms);
+    return static_cast<uint32_t>(std::max(1.0, bounded_ms));
 }
 
-BackendStatus RunOneInference(INpuBackend& backend, const TensorBuffer& input,
+void DestroyBackend(INpuBackend& backend) {
+    std::string ignored;
+    (void)backend.Destroy(50U, ignored);
+}
+
+BackendStatus RunOneInference(INpuBackend& backend, const TensorSet& inputs,
                               uint64_t index, uint32_t timeout_ms,
                               InferenceResult& result, double& host_time_ms,
                               std::string& stage, std::string& error) {
     const double start = NowSeconds();
-    if (!backend.SetInput(input, error)) {
+    if (timeout_ms == 0) {
+        error = "global workload deadline reached before inference submission";
+        stage = "INFERENCE_TIMEOUT";
+        host_time_ms = 0.0;
+        return BackendStatus::Timeout;
+    }
+    BackendStatus status = backend.SetInputs(inputs, error);
+    if (status != BackendStatus::Ok) {
         stage = "SET_INPUT_FAILED";
         host_time_ms = (NowSeconds() - start) * 1000.0;
-        return BackendStatus::Error;
+        return status;
     }
-    BackendStatus status = backend.SubmitInference(index, error);
+    status = backend.SubmitInference(index, error);
     if (status != BackendStatus::Ok) {
         stage = "SUBMIT_FAILED";
         host_time_ms = (NowSeconds() - start) * 1000.0;
@@ -64,10 +68,11 @@ BackendStatus RunOneInference(INpuBackend& backend, const TensorBuffer& input,
         host_time_ms = (NowSeconds() - start) * 1000.0;
         return status;
     }
-    if (!backend.ReadOutput(result, error)) {
+    status = backend.ReadOutputs(result, error);
+    if (status != BackendStatus::Ok) {
         stage = "READ_OUTPUT_FAILED";
         host_time_ms = (NowSeconds() - start) * 1000.0;
-        return BackendStatus::Error;
+        return status;
     }
     host_time_ms = (NowSeconds() - start) * 1000.0;
     stage.clear();
@@ -105,6 +110,32 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
     logger.EmitStart(cfg);
 
     const double total_start = NowSeconds();
+    const ProfileSpec* registered_profile = FindProfileSpec(cfg.profile);
+    if (!registered_profile) {
+        const std::string message = "unknown NPU profile: " + cfg.profile;
+        logger.EmitError(NowMs(), 0, "API_ERROR", "UNKNOWN_PROFILE", message);
+        SummaryData summary = BasicSummary(cfg, {}, ResultCode::API_ERROR, message, "UNKNOWN_PROFILE");
+        summary.api_error_count = 1;
+        summary.backend_error_count = 1;
+        logger.EmitSummary(summary);
+        return summary.result;
+    }
+    ProfileSpec active_profile = *registered_profile;
+    TensorSet inputs;
+    ProfileManifest manifest;
+    if (!cfg.input_manifest.empty()) {
+        if (!LoadProfileManifest(cfg.input_manifest, cfg.profile, manifest, error)) {
+            logger.EmitError(NowMs(), 0, "API_ERROR", "MANIFEST_LOAD_FAILED", error);
+            SummaryData summary = BasicSummary(cfg, {}, ResultCode::API_ERROR,
+                                               error, "MANIFEST_LOAD_FAILED");
+            summary.api_error_count = 1;
+            summary.backend_error_count = 1;
+            logger.EmitSummary(summary);
+            return summary.result;
+        }
+        active_profile = manifest.profile;
+        inputs = manifest.inputs;
+    }
     std::unique_ptr<INpuBackend> backend = CreateBackend(cfg);
     if (!backend) {
         const std::string message = "unsupported NPU backend: " + cfg.backend;
@@ -116,32 +147,49 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         return summary.result;
     }
 
-    if (!backend->Init(cfg, error)) {
-        logger.EmitError(NowMs(), 0, "API_ERROR", "BACKEND_INIT_FAILED", error);
+    if (!backend->SupportsProfile(active_profile)) {
+        const std::string message = "backend '" + cfg.backend + "' does not support profile '" +
+                                    active_profile.id + "'";
+        logger.EmitError(NowMs(), 0, "API_ERROR", "UNSUPPORTED_PROFILE", message);
         SummaryData summary = BasicSummary(cfg, backend->GetExecutionInfo(), ResultCode::API_ERROR,
+                                           message, "UNSUPPORTED_PROFILE");
+        summary.api_error_count = 1;
+        summary.backend_error_count = 1;
+        logger.EmitSummary(summary);
+        DestroyBackend(*backend);
+        return summary.result;
+    }
+
+    BackendStatus lifecycle_status = backend->Init(cfg, active_profile, error);
+    if (lifecycle_status != BackendStatus::Ok) {
+        logger.EmitError(NowMs(), 0, "API_ERROR", "BACKEND_INIT_FAILED", error);
+        SummaryData summary = BasicSummary(cfg, backend->GetExecutionInfo(),
+                                           BackendStatusToResult(lifecycle_status),
                                            error, "BACKEND_INIT_FAILED");
         summary.api_error_count = 1;
         summary.backend_error_count = 1;
         logger.EmitSummary(summary);
-        backend->Destroy();
+        DestroyBackend(*backend);
         return summary.result;
     }
-    if (!backend->CreateResources(error)) {
+    lifecycle_status = backend->CreateResources(error);
+    if (lifecycle_status != BackendStatus::Ok) {
         logger.EmitError(NowMs(), 0, "ALLOCATION_FAIL", "RESOURCE_CREATE_FAILED", error);
-        SummaryData summary = BasicSummary(cfg, backend->GetExecutionInfo(), ResultCode::ALLOCATION_FAIL,
+        SummaryData summary = BasicSummary(cfg, backend->GetExecutionInfo(),
+                                           BackendStatusToResult(lifecycle_status),
                                            error, "RESOURCE_CREATE_FAILED");
         summary.allocation_fail_count = 1;
         summary.backend_error_count = 1;
         logger.EmitSummary(summary);
-        backend->Destroy();
+        DestroyBackend(*backend);
         return summary.result;
     }
-    const TensorBuffer input = BuildInput(cfg);
     const double prepare_time_ms = (NowSeconds() - total_start) * 1000.0;
     const BackendExecutionInfo execution = backend->GetExecutionInfo();
     Verifier verifier(cfg);
 
     uint64_t completed_warmup = 0;
+    uint64_t warmup_operation_count = 0;
     Heartbeat warmup_heartbeat(cfg.heartbeat_interval_s);
     const double warmup_start = NowSeconds();
     for (; completed_warmup < cfg.warmup_inferences; ++completed_warmup) {
@@ -153,14 +201,14 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
             summary.actual_warmup_inferences = completed_warmup;
             summary.timeout_count = 1;
             logger.EmitSummary(summary);
-            backend->Destroy();
+            DestroyBackend(*backend);
             return summary.result;
         }
         InferenceResult warmup_result;
         double host_ms = 0.0;
         std::string stage;
-        const BackendStatus status = RunOneInference(*backend, input, completed_warmup,
-            cfg.inference_timeout_ms, warmup_result, host_ms, stage, error);
+        const BackendStatus status = RunOneInference(*backend, inputs, completed_warmup,
+            EffectiveInferenceTimeoutMs(cfg, total_start), warmup_result, host_ms, stage, error);
         if (status != BackendStatus::Ok) {
             const ResultCode result = BackendStatusToResult(status);
             logger.EmitError(NowMs(), completed_warmup, ResultToString(result), stage, error);
@@ -169,12 +217,18 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
             summary.actual_warmup_inferences = completed_warmup;
             CountFailure(result, summary);
             logger.EmitSummary(summary);
-            backend->Destroy();
+            DestroyBackend(*backend);
             return summary.result;
+        }
+        if (warmup_result.operation_count >
+            std::numeric_limits<uint64_t>::max() - warmup_operation_count) {
+            warmup_operation_count = std::numeric_limits<uint64_t>::max();
+        } else {
+            warmup_operation_count += warmup_result.operation_count;
         }
         double ignored_rate = 0.0;
         warmup_heartbeat.MaybeEmit(logger, NowMs(), NowSeconds() - warmup_start, "warmup",
-            completed_warmup + 1U, warmup_result.operation_count, host_ms,
+            completed_warmup + 1U, warmup_operation_count, host_ms,
             warmup_result.device_time_ms, 0, 0, ignored_rate);
     }
 
@@ -182,7 +236,8 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         InferenceResult result;
         double host_ms = 0.0;
         std::string stage;
-        const BackendStatus status = RunOneInference(*backend, input, 0, cfg.inference_timeout_ms,
+        const BackendStatus status = RunOneInference(*backend, inputs, 0,
+                                                      EffectiveInferenceTimeoutMs(cfg, total_start),
                                                       result, host_ms, stage, error);
         if (status != BackendStatus::Ok) {
             const ResultCode code = BackendStatusToResult(status);
@@ -192,10 +247,10 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
             summary.actual_warmup_inferences = completed_warmup;
             CountFailure(code, summary);
             logger.EmitSummary(summary);
-            backend->Destroy();
+            DestroyBackend(*backend);
             return code;
         }
-        const std::string checksum = verifier.ComputeChecksum(result.output);
+        const std::string checksum = verifier.ComputeChecksum(result.outputs);
         logger.EmitGolden(cfg, checksum);
         SummaryData summary = BasicSummary(cfg, execution, ResultCode::PASS, "", "");
         summary.prepare_time_ms = prepare_time_ms;
@@ -208,7 +263,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         summary.checksum = checksum;
         summary.golden_checksum = checksum;
         logger.EmitSummary(summary);
-        backend->Destroy();
+        DestroyBackend(*backend);
         return summary.result;
     }
 
@@ -245,8 +300,8 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
 
         InferenceResult inference;
         std::string stage;
-        const BackendStatus status = RunOneInference(*backend, input, inference_count,
-            cfg.inference_timeout_ms, inference, last_host_ms, stage, error);
+        const BackendStatus status = RunOneInference(*backend, inputs, inference_count,
+            EffectiveInferenceTimeoutMs(cfg, total_start), inference, last_host_ms, stage, error);
         if (status != BackendStatus::Ok) {
             final_result = BackendStatusToResult(status);
             CountFailure(final_result, counters);
@@ -271,12 +326,12 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         } else {
             last_device_ms = 0.0;
         }
-        last_checksum = verifier.ComputeChecksum(inference.output);
+        last_checksum = verifier.ComputeChecksum(inference.outputs);
         logger.EmitInference(inference_count, inference, last_host_ms, last_checksum);
 
         if (verifier.Enabled() && cfg.verify_interval > 0 &&
             inference_count % cfg.verify_interval == 0) {
-            const VerifyResult verification = verifier.Verify(inference.output, inference_count);
+            const VerifyResult verification = verifier.Verify(inference.outputs, inference_count);
             last_golden = verification.golden_checksum;
             logger.EmitVerify({verification.inference, verification.verify_mode,
                 verification.checksum, verification.golden_checksum, verification.pass,
@@ -300,7 +355,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
     }
 
     const double actual_duration_s = NowSeconds() - run_start;
-    backend->Destroy();
+    DestroyBackend(*backend);
 
     SummaryData summary;
     summary.result = final_result;

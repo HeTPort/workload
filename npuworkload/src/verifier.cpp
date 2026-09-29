@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
+#include <vector>
 
 namespace npu_avs {
 namespace {
@@ -17,22 +19,60 @@ std::string NormalizeHex(std::string value, size_t width) {
     return value;
 }
 
+void AppendU32(std::vector<uint8_t>& bytes, uint32_t value) {
+    for (unsigned shift = 0; shift < 32U; shift += 8U) {
+        bytes.push_back(static_cast<uint8_t>((value >> shift) & 0xffU));
+    }
+}
+
+void AppendString(std::vector<uint8_t>& bytes, const std::string& value) {
+    AppendU32(bytes, static_cast<uint32_t>(value.size()));
+    bytes.insert(bytes.end(), value.begin(), value.end());
+}
+
+std::vector<uint8_t> EncodeTensorSet(const TensorSet& outputs) {
+    std::vector<uint8_t> encoded;
+    AppendU32(encoded, static_cast<uint32_t>(outputs.size()));
+    for (const TensorBuffer& output : outputs) {
+        AppendString(encoded, output.spec.name);
+        AppendString(encoded, TensorDataTypeName(output.spec.data_type));
+        AppendString(encoded, TensorLayoutName(output.spec.layout));
+        AppendString(encoded, QuantizationModeName(output.spec.quantization.mode));
+        AppendU32(encoded, static_cast<uint32_t>(output.spec.shape.size()));
+        for (uint32_t dimension : output.spec.shape) AppendU32(encoded, dimension);
+        AppendU32(encoded, static_cast<uint32_t>(output.spec.quantization.scales.size()));
+        for (float scale : output.spec.quantization.scales) {
+            uint32_t bits = 0;
+            std::memcpy(&bits, &scale, sizeof(bits));
+            AppendU32(encoded, bits);
+        }
+        for (int32_t zero_point : output.spec.quantization.zero_points) {
+            AppendU32(encoded, static_cast<uint32_t>(zero_point));
+        }
+        AppendU32(encoded, static_cast<uint32_t>(output.spec.quantization.axis));
+        AppendU32(encoded, static_cast<uint32_t>(output.data.size()));
+        encoded.insert(encoded.end(), output.data.begin(), output.data.end());
+    }
+    return encoded;
+}
+
 } // namespace
 
 Verifier::Verifier(const WorkloadConfig& cfg) : cfg_(cfg) {}
 
 bool Verifier::Enabled() const { return cfg_.verify_mode != "none" || cfg_.generate_golden; }
 
-std::string Verifier::ComputeChecksum(const TensorBuffer& output) const {
-    if (cfg_.verify_mode == "crc") return Crc32Hex(output.data.data(), output.data.size());
-    return Checksum64Hex(output.data.data(), output.data.size());
+std::string Verifier::ComputeChecksum(const TensorSet& outputs) const {
+    const std::vector<uint8_t> encoded = EncodeTensorSet(outputs);
+    if (cfg_.verify_mode == "crc") return Crc32Hex(encoded.data(), encoded.size());
+    return Checksum64Hex(encoded.data(), encoded.size());
 }
 
-VerifyResult Verifier::Verify(const TensorBuffer& output, uint64_t inference_index) {
+VerifyResult Verifier::Verify(const TensorSet& outputs, uint64_t inference_index) {
     VerifyResult result;
     result.inference = inference_index;
     result.verify_mode = cfg_.verify_mode;
-    result.checksum = ComputeChecksum(output);
+    result.checksum = ComputeChecksum(outputs);
     if (cfg_.verify_mode == "none") {
         result.message = "verification disabled";
         return result;
@@ -47,7 +87,7 @@ VerifyResult Verifier::Verify(const TensorBuffer& output, uint64_t inference_ind
     }
     result.pass = result.checksum == result.golden_checksum;
     result.mismatch_count = result.pass ? 0U : 1U;
-    result.message = result.pass ? "tensor checksum matched" : "tensor checksum mismatch";
+    result.message = result.pass ? "tensor-set checksum matched" : "tensor-set checksum mismatch";
     return result;
 }
 

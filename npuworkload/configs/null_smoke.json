@@ -1,11 +1,9 @@
 {
-  "profile": "null",
+  "profile": "framework_smoke",
   "backend": "null",
-  "workload": "identity",
+  "input_manifest": "profiles/framework_smoke/manifest.json",
   "duration": 0,
   "inferences": 10,
   "warmup_inferences": 0,
-  "input_elements": 64,
-  "output_elements": 64,
   "verify_mode": "checksum"
 }

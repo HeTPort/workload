@@ -1,12 +1,10 @@
 {
-  "profile": "reference",
+  "profile": "framework_smoke",
   "backend": "reference_cpu",
-  "workload": "synthetic_dense",
+  "input_manifest": "profiles/framework_smoke/manifest.json",
   "duration": 0,
   "inferences": 10,
   "warmup_inferences": 1,
-  "input_elements": 64,
-  "output_elements": 12,
   "verify_mode": "checksum",
   "verify_interval": 1,
   "heartbeat_interval": 1.0

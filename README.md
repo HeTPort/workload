@@ -1,6 +1,6 @@
 # AVS Workloads
 
-This repository contains separate GPU, CPU, and NPU workload projects for AVS low-power evaluation. The NPU project currently provides its portable runner baseline, asynchronous backend contract, and deterministic null/reference backends; hardware runtime integration follows in later phases.
+This repository contains separate GPU, CPU, and NPU workload projects for AVS low-power evaluation. The NPU project currently provides its portable runner, workload-profile registry, ordered multi-tensor asynchronous backend contract, bounded timeout cleanup, and deterministic framework-test backends; real workload assets and hardware runtime integration follow in later phases.
 
 ```text
 .

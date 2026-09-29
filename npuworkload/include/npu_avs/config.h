@@ -6,23 +6,21 @@
 namespace npu_avs {
 
 struct WorkloadConfig {
-    std::string profile = "reference";
+    std::string profile = "framework_smoke";
     std::string api = "npu";
     std::string mode = "inference";
     std::string backend = "reference_cpu";
-    std::string workload = "synthetic_dense";
+    std::string workload = "framework_smoke";
     std::string model_path;
     std::string input_manifest;
 
     double duration_s = 60.0;
     uint64_t inferences = 0;
-    uint32_t warmup_inferences = 1;
+    uint64_t warmup_inferences = 1;
     double timeout_s = 95.0;
     uint32_t inference_timeout_ms = 5000;
     uint32_t simulated_latency_ms = 0;
 
-    uint32_t input_elements = 64;
-    uint32_t output_elements = 12;
     uint64_t seed = 0x123456789abcdef0ULL;
 
     std::string verify_mode = "checksum";

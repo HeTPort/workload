@@ -2,10 +2,15 @@
 
 #include "npu_avs/backend.h"
 
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <exception>
-#include <future>
+#include <functional>
+#include <memory>
+#include <mutex>
 #include <new>
+#include <thread>
 #include <utility>
 
 namespace npu_avs {
@@ -18,49 +23,72 @@ protected:
         std::string error;
     };
 
-    void Configure(const WorkloadConfig& cfg) { cfg_ = cfg; }
-    virtual WorkResult Execute(const TensorBuffer& input, uint64_t inference_index) = 0;
+    using WorkTask = std::function<WorkResult(const std::atomic<bool>& cancel_requested)>;
+
+    void Configure(const WorkloadConfig& cfg, const ProfileSpec& profile) {
+        cfg_ = cfg;
+        profile_ = profile;
+    }
+
+    virtual WorkTask MakeTask(const TensorSet& inputs, uint64_t inference_index) const = 0;
 
 public:
-    bool SetInput(const TensorBuffer& input, std::string& error) override {
-        if (pending_.valid() || completed_) {
-            error = "cannot set input while an inference is pending or unread";
-            return false;
+    BackendStatus SetInputs(const TensorSet& inputs, std::string& error) override {
+        if (task_state_ || completed_) {
+            error = "cannot set inputs while an inference is pending or unread";
+            return BackendStatus::Error;
         }
-        if (!ValidateTensor(input, error)) return false;
-        if (input.data_type != TensorDataType::Int8 ||
-            TensorElementCount(input) != cfg_.input_elements) {
-            error = "backend expects the configured number of int8 input elements";
-            return false;
-        }
-        input_ = input;
-        input_set_ = true;
-        return true;
+        if (!ValidateTensorSet(inputs, profile_.inputs, error)) return BackendStatus::Error;
+        inputs_ = inputs;
+        inputs_set_ = true;
+        return BackendStatus::Ok;
     }
 
     BackendStatus SubmitInference(uint64_t inference_index, std::string& error) override {
-        if (!input_set_) {
-            error = "input must be set before inference submission";
+        if (!inputs_set_) {
+            error = "inputs must be set before inference submission";
             return BackendStatus::Error;
         }
-        if (pending_.valid() || completed_) {
-            error = "previous inference has not been read";
+        if (task_state_ || worker_.joinable() || completed_) {
+            error = "previous inference has not been read or destroyed";
             return BackendStatus::Error;
         }
-        const TensorBuffer input = input_;
+
+        WorkTask task;
         try {
-            pending_ = std::async(std::launch::async, [this, input, inference_index]() {
+            task = MakeTask(inputs_, inference_index);
+        } catch (const std::exception& exception) {
+            error = std::string("failed to prepare asynchronous inference: ") + exception.what();
+            return BackendStatus::Error;
+        }
+        if (!task) {
+            error = "backend did not provide an inference task";
+            return BackendStatus::Error;
+        }
+
+        task_state_ = std::make_shared<TaskState>();
+        const std::shared_ptr<TaskState> state = task_state_;
+        try {
+            worker_ = std::thread([state, task = std::move(task)]() mutable {
+                WorkResult work;
                 try {
-                    return Execute(input, inference_index);
+                    work = task(state->cancel_requested);
                 } catch (const std::bad_alloc&) {
-                    return WorkResult{BackendStatus::AllocationFail, {}, "backend allocation failed"};
+                    work = {BackendStatus::AllocationFail, {}, "backend allocation failed"};
                 } catch (const std::exception& exception) {
-                    return WorkResult{BackendStatus::Error, {}, exception.what()};
+                    work = {BackendStatus::Error, {}, exception.what()};
                 } catch (...) {
-                    return WorkResult{BackendStatus::UnknownError, {}, "unknown backend exception"};
+                    work = {BackendStatus::UnknownError, {}, "unknown backend exception"};
                 }
+                {
+                    std::lock_guard<std::mutex> lock(state->mutex);
+                    state->work = std::move(work);
+                    state->done = true;
+                }
+                state->condition.notify_all();
             });
         } catch (const std::exception& exception) {
+            task_state_.reset();
             error = std::string("failed to launch asynchronous inference: ") + exception.what();
             return BackendStatus::Error;
         }
@@ -68,54 +96,99 @@ public:
     }
 
     BackendStatus WaitForCompletion(uint32_t timeout_ms, std::string& error) override {
-        if (!pending_.valid()) {
+        if (!task_state_) {
             error = "no inference is pending";
             return BackendStatus::Error;
         }
-        if (pending_.wait_for(std::chrono::milliseconds(timeout_ms)) != std::future_status::ready) {
-            error = "inference completion timeout";
-            return BackendStatus::Timeout;
+        WorkResult work;
+        {
+            std::unique_lock<std::mutex> lock(task_state_->mutex);
+            if (!task_state_->condition.wait_for(lock, std::chrono::milliseconds(timeout_ms),
+                    [this]() { return task_state_->done; })) {
+                task_state_->cancel_requested.store(true, std::memory_order_relaxed);
+                error = "inference completion timeout";
+                return BackendStatus::Timeout;
+            }
+            work = std::move(task_state_->work);
         }
-        WorkResult work = pending_.get();
+        if (worker_.joinable()) worker_.join();
+        task_state_.reset();
+        inputs_set_ = false;
         if (work.status != BackendStatus::Ok) {
             error = work.error.empty() ? "asynchronous inference failed" : work.error;
             return work.status;
+        }
+        if (!ValidateTensorSet(work.inference.outputs, profile_.outputs, error)) {
+            return BackendStatus::Error;
         }
         result_ = std::move(work.inference);
         completed_ = true;
         return BackendStatus::Ok;
     }
 
-    bool ReadOutput(InferenceResult& output, std::string& error) override {
+    BackendStatus ReadOutputs(InferenceResult& output, std::string& error) override {
         if (!completed_) {
-            error = "inference output is not ready";
-            return false;
+            error = "inference outputs are not ready";
+            return BackendStatus::Error;
         }
-        output = result_;
-        completed_ = false;
-        input_set_ = false;
-        return true;
-    }
-
-    void Destroy() override {
-        if (pending_.valid()) {
-            try { (void)pending_.get(); } catch (...) {}
-        }
-        input_ = {};
+        output = std::move(result_);
         result_ = {};
-        input_set_ = false;
         completed_ = false;
+        return BackendStatus::Ok;
     }
 
-    virtual ~AsyncBackendBase() { Destroy(); }
+    BackendStatus Destroy(uint32_t timeout_ms, std::string& error) override {
+        BackendStatus status = BackendStatus::Ok;
+        if (task_state_) {
+            task_state_->cancel_requested.store(true, std::memory_order_relaxed);
+            bool done = false;
+            {
+                std::unique_lock<std::mutex> lock(task_state_->mutex);
+                done = task_state_->condition.wait_for(lock, std::chrono::milliseconds(timeout_ms),
+                    [this]() { return task_state_->done; });
+            }
+            if (worker_.joinable()) {
+                if (done) worker_.join();
+                else worker_.detach();
+            }
+            if (!done) {
+                error = "backend teardown exceeded its cancellation grace period";
+                status = BackendStatus::Timeout;
+            }
+        } else if (worker_.joinable()) {
+            worker_.join();
+        }
+        task_state_.reset();
+        inputs_.clear();
+        result_ = {};
+        inputs_set_ = false;
+        completed_ = false;
+        return status;
+    }
 
+    ~AsyncBackendBase() override {
+        std::string ignored;
+        (void)Destroy(50U, ignored);
+    }
+
+protected:
     WorkloadConfig cfg_;
+    ProfileSpec profile_;
 
 private:
-    TensorBuffer input_;
+    struct TaskState {
+        std::mutex mutex;
+        std::condition_variable condition;
+        std::atomic<bool> cancel_requested{false};
+        bool done = false;
+        WorkResult work;
+    };
+
+    TensorSet inputs_;
     InferenceResult result_;
-    std::future<WorkResult> pending_;
-    bool input_set_ = false;
+    std::shared_ptr<TaskState> task_state_;
+    std::thread worker_;
+    bool inputs_set_ = false;
     bool completed_ = false;
 };
 

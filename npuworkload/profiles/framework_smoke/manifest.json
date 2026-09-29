@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "profile": {
+    "id": "framework_smoke",
+    "version": "1",
+    "workload": "framework_smoke",
+    "default_backend": "reference_cpu"
+  },
+  "asset_root": "assets",
+  "model": {
+    "format": "none",
+    "file": "",
+    "sha256": "",
+    "provenance": "Repository-owned deterministic framework fixture"
+  },
+  "sample_id": "framework-smoke-001",
+  "preprocessing_version": "raw-v1",
+  "postprocessing_version": "framework-v1",
+  "inputs": [
+    {
+      "name": "features",
+      "dtype": "int8",
+      "shape": [1, 65],
+      "layout": "nc",
+      "quantization": {
+        "mode": "per_tensor",
+        "scales": [0.03125],
+        "zero_points": [0]
+      },
+      "file": "features.bin",
+      "sha256": "2fe71e1bfad87e29801eeafefbf477c3e6581cfaf901f56da29f35c4ba95577d"
+    },
+    {
+      "name": "context",
+      "dtype": "uint8",
+      "shape": [1, 4],
+      "layout": "nc",
+      "quantization": {
+        "mode": "none"
+      },
+      "file": "context.bin",
+      "sha256": "963836db40284db1d946d02a363d20cdc8fd8cd523e61251eec1f9f7500d46c3"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "scores",
+      "dtype": "int8",
+      "shape": [1, 12],
+      "layout": "nc",
+      "quantization": {
+        "mode": "per_tensor",
+        "scales": [0.03125],
+        "zero_points": [0]
+      }
+    },
+    {
+      "name": "diagnostics",
+      "dtype": "float32",
+      "shape": [1, 2],
+      "layout": "nc",
+      "quantization": {
+        "mode": "none"
+      }
+    }
+  ],
+  "goldens": [],
+  "tolerance": {
+    "mode": "exact",
+    "absolute": 0,
+    "relative": 0
+  }
+}

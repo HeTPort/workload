@@ -26,8 +26,9 @@ if ($Target -eq "desktop" -and -not $CMake) {
     New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
     $Sources = @(
         "src/main.cpp", "src/backend_factory.cpp", "src/config.cpp", "src/crc32.cpp",
-        "src/heartbeat.cpp", "src/logger.cpp", "src/metrics.cpp", "src/profile.cpp",
-        "src/runner.cpp", "src/tensor.cpp", "src/utils.cpp", "src/verifier.cpp",
+        "src/heartbeat.cpp", "src/json.cpp", "src/logger.cpp", "src/manifest.cpp",
+        "src/metrics.cpp", "src/profile.cpp", "src/runner.cpp", "src/sha256.cpp",
+        "src/tensor.cpp", "src/utils.cpp", "src/verifier.cpp",
         "src/backends/null/null_backend.cpp",
         "src/backends/reference_cpu/reference_cpu_backend.cpp"
     ) | ForEach-Object { Join-Path $ProjectRoot $_ }
@@ -40,6 +41,19 @@ if ($Target -eq "desktop" -and -not $CMake) {
     ) + $Sources
     & $Compiler.Source @Arguments
     if ($LASTEXITCODE -ne 0) { throw "g++ build failed with exit code $LASTEXITCODE" }
+    $ContractOutput = Join-Path $BuildDirectory "npu-contract-tests.exe"
+    $ContractSources = @(
+        "tests/contract_tests.cpp", "src/json.cpp", "src/manifest.cpp", "src/profile.cpp",
+        "src/sha256.cpp", "src/tensor.cpp",
+        "src/backends/null/null_backend.cpp"
+    ) | ForEach-Object { Join-Path $ProjectRoot $_ }
+    $ContractArguments = @(
+        "-std=c++17", $Optimization, "-Wall", "-Wextra", "-Wpedantic",
+        "-static-libgcc", "-static-libstdc++", "-I", (Join-Path $ProjectRoot "include"),
+        "-I", (Join-Path $ProjectRoot "src"), "-o", $ContractOutput
+    ) + $ContractSources
+    & $Compiler.Source @ContractArguments
+    if ($LASTEXITCODE -ne 0) { throw "contract test build failed with exit code $LASTEXITCODE" }
     Write-Host "Built $Output"
 } else {
     if (-not $CMake) { throw "cmake is required for Android and HarmonyOS builds." }

@@ -22,8 +22,8 @@ class Verifier {
 public:
     explicit Verifier(const WorkloadConfig& cfg);
     bool Enabled() const;
-    VerifyResult Verify(const TensorBuffer& output, uint64_t inference_index);
-    std::string ComputeChecksum(const TensorBuffer& output) const;
+    VerifyResult Verify(const TensorSet& outputs, uint64_t inference_index);
+    std::string ComputeChecksum(const TensorSet& outputs) const;
 
 private:
     WorkloadConfig cfg_;

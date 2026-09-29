@@ -81,8 +81,6 @@ void Logger::EmitStart(const WorkloadConfig& cfg) {
        << ",\"input_manifest\":\"" << JsonEscape(cfg.input_manifest) << "\""
        << ",\"duration_s\":" << cfg.duration_s
        << ",\"warmup_inferences\":" << cfg.warmup_inferences
-       << ",\"input_elements\":" << cfg.input_elements
-       << ",\"output_elements\":" << cfg.output_elements
        << ",\"seed\":" << cfg.seed << '}';
     WriteLine(os.str());
 }
@@ -112,6 +110,7 @@ void Logger::EmitInference(uint64_t inference, const InferenceResult& result,
     std::ostringstream os;
     os << std::fixed << std::setprecision(4)
        << "{\"type\":\"inference\",\"inference\":" << inference
+       << ",\"output_count\":" << result.outputs.size()
        << ",\"operation_count\":" << result.operation_count
        << ",\"host_time_ms\":" << host_time_ms
        << ",\"device_time_valid\":" << (result.device_time_valid ? "true" : "false")

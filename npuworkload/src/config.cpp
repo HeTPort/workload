@@ -104,19 +104,16 @@ bool ApplyKeyValue(WorkloadConfig& cfg, const std::string& key, const std::strin
     else if (key == "api") cfg.api = value;
     else if (key == "mode") cfg.mode = value;
     else if (key == "backend") cfg.backend = value;
-    else if (key == "workload") cfg.workload = value;
     else if (key == "model" || key == "model_path") cfg.model_path = value;
     else if (key == "input-manifest" || key == "input_manifest") cfg.input_manifest = value;
     else if (key == "config") cfg.config_path = value;
     else if (key == "duration" || key == "duration_s") cfg.duration_s = ToDouble(value);
     else if (key == "inferences" || key == "batches" || key == "frames") cfg.inferences = ToU64(value);
-    else if (key == "warmup-inferences" || key == "warmup_inferences") cfg.warmup_inferences = ToU32(value);
+    else if (key == "warmup-inferences" || key == "warmup_inferences") cfg.warmup_inferences = ToU64(value);
     else if (key == "timeout" || key == "timeout_s") cfg.timeout_s = ToDouble(value);
     else if (key == "inference-timeout-ms" || key == "inference_timeout_ms" ||
              key == "batch-timeout-ms" || key == "batch_timeout_ms") cfg.inference_timeout_ms = ToU32(value);
     else if (key == "simulated-latency-ms" || key == "simulated_latency_ms") cfg.simulated_latency_ms = ToU32(value);
-    else if (key == "input-elements" || key == "input_elements") cfg.input_elements = ToU32(value);
-    else if (key == "output-elements" || key == "output_elements") cfg.output_elements = ToU32(value);
     else if (key == "seed") cfg.seed = ToU64(value);
     else if (key == "verify-mode" || key == "verify_mode") cfg.verify_mode = value;
     else if (key == "verify-interval" || key == "verify_interval" ||
@@ -185,6 +182,12 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
 }
 
 bool ValidateConfig(const WorkloadConfig& cfg, std::string& error) {
+    const ProfileSpec* profile = FindProfileSpec(cfg.profile);
+    if (!profile) { error = "unknown profile: " + cfg.profile; return false; }
+    if (cfg.workload != profile->workload) {
+        error = "workload identity must match the selected profile";
+        return false;
+    }
     if (cfg.api != "npu") { error = "unsupported api for NPU workload: " + cfg.api; return false; }
     if (cfg.mode != "inference") { error = "unsupported mode for NPU workload: " + cfg.mode; return false; }
     if (cfg.duration_s <= 0.0 && cfg.inferences == 0) {
@@ -195,11 +198,6 @@ bool ValidateConfig(const WorkloadConfig& cfg, std::string& error) {
         error = "timeout and inference-timeout-ms must be positive";
         return false;
     }
-    if (cfg.input_elements == 0 || cfg.output_elements == 0 ||
-        cfg.input_elements > 1024U * 1024U || cfg.output_elements > 1024U * 1024U) {
-        error = "tensor element counts must be in [1,1048576]";
-        return false;
-    }
     if (cfg.output_format != "jsonl") { error = "only jsonl output is supported"; return false; }
     if (cfg.verify_mode != "none" && cfg.verify_mode != "checksum" && cfg.verify_mode != "crc") {
         error = "unsupported verify mode: " + cfg.verify_mode;
@@ -207,10 +205,6 @@ bool ValidateConfig(const WorkloadConfig& cfg, std::string& error) {
     }
     if (cfg.verify_mode != "none" && cfg.verify_interval == 0 && !cfg.generate_golden) {
         error = "verify-interval must be positive when verification is enabled";
-        return false;
-    }
-    if (static_cast<uint64_t>(cfg.input_elements) * cfg.output_elements > 100000000ULL) {
-        error = "synthetic tensor shape exceeds the 100 million operation-pair safety limit";
         return false;
     }
     if (!cfg.golden_checksum.empty()) {
@@ -282,8 +276,6 @@ void DumpEffectiveConfig(const WorkloadConfig& cfg) {
               << ",\"timeout_s\":" << cfg.timeout_s
               << ",\"inference_timeout_ms\":" << cfg.inference_timeout_ms
               << ",\"simulated_latency_ms\":" << cfg.simulated_latency_ms
-              << ",\"input_elements\":" << cfg.input_elements
-              << ",\"output_elements\":" << cfg.output_elements
               << ",\"seed\":" << cfg.seed
               << ",\"verify_mode\":\"" << JsonEscape(cfg.verify_mode)
               << "\",\"verify_interval\":" << cfg.verify_interval
@@ -299,10 +291,9 @@ void PrintHelp() {
 Usage: npu-avs-workload [options]
 
 Core:
-  --profile <null|reference>
+  --profile <kws01|ic01|ad01|sww01|framework_smoke>
   --backend <null|reference_cpu>
   --config <path>                 Flat JSON configuration
-  --workload <name>
   --model <path>
   --input-manifest <path>
 
@@ -313,8 +304,6 @@ Runtime:
   --timeout <sec>
   --inference-timeout-ms <ms>
   --simulated-latency-ms <ms>     Test-only backend delay
-  --input-elements <count>
-  --output-elements <count>
   --seed <integer>
 
 Verification and output:
@@ -331,6 +320,6 @@ Utility: --list-profiles --dump-effective-config --help --version
 )";
 }
 
-void PrintVersion() { std::cout << "npu-avs-workload 0.1.0\n"; }
+void PrintVersion() { std::cout << "npu-avs-workload 0.2.0\n"; }
 
 } // namespace npu_avs
