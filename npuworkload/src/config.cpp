@@ -106,6 +106,9 @@ bool ApplyKeyValue(WorkloadConfig& cfg, const std::string& key, const std::strin
     else if (key == "backend") cfg.backend = value;
     else if (key == "model" || key == "model_path") cfg.model_path = value;
     else if (key == "input-manifest" || key == "input_manifest") cfg.input_manifest = value;
+    else if (key == "runtime-library" || key == "runtime_library") cfg.runtime_library = value;
+    else if (key == "delegate-library" || key == "delegate_library") cfg.delegate_library = value;
+    else if (key == "delegate-options" || key == "delegate_options") cfg.delegate_options = value;
     else if (key == "config") cfg.config_path = value;
     else if (key == "duration" || key == "duration_s") cfg.duration_s = ToDouble(value);
     else if (key == "inferences" || key == "batches" || key == "frames") cfg.inferences = ToU64(value);
@@ -270,6 +273,9 @@ void DumpEffectiveConfig(const WorkloadConfig& cfg) {
               << "\",\"workload\":\"" << JsonEscape(cfg.workload)
               << "\",\"model\":\"" << JsonEscape(cfg.model_path)
               << "\",\"input_manifest\":\"" << JsonEscape(cfg.input_manifest)
+              << "\",\"runtime_library\":\"" << JsonEscape(cfg.runtime_library)
+              << "\",\"delegate_library\":\"" << JsonEscape(cfg.delegate_library)
+              << "\",\"delegate_options\":\"" << JsonEscape(cfg.delegate_options)
               << "\",\"duration_s\":" << cfg.duration_s
               << ",\"inferences\":" << cfg.inferences
               << ",\"warmup_inferences\":" << cfg.warmup_inferences
@@ -292,10 +298,13 @@ Usage: npu-avs-workload [options]
 
 Core:
   --profile <kws01|ic01|ad01|sww01|framework_smoke>
-  --backend <null|reference_cpu>
+  --backend <null|reference_cpu|tflite_delegate>
   --config <path>                 Flat JSON configuration
   --model <path>
   --input-manifest <path>
+  --runtime-library <path>        TensorFlow Lite C shared library
+  --delegate-library <path>       Vendor external-delegate shared library
+  --delegate-options <k=v;...>    External-delegate key/value options
 
 Runtime:
   --duration <sec>
@@ -320,6 +329,6 @@ Utility: --list-profiles --dump-effective-config --help --version
 )";
 }
 
-void PrintVersion() { std::cout << "npu-avs-workload 0.2.0\n"; }
+void PrintVersion() { std::cout << "npu-avs-workload 0.3.0\n"; }
 
 } // namespace npu_avs

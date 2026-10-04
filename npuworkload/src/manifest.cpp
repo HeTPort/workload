@@ -523,6 +523,9 @@ bool LoadProfileManifest(const std::string& path, const std::string& expected_pr
         manifest.model.path = model_path.string();
         manifest.model.sha256 = actual_hash;
     }
+    manifest.profile.model_format = manifest.model.format;
+    manifest.profile.model_path = manifest.model.path;
+    manifest.profile.model_sha256 = manifest.model.sha256;
 
     if (!ReadString(root, "sample_id", manifest.sample_id, "manifest", error) ||
         !ReadString(root, "preprocessing_version", manifest.preprocessing_version, "manifest", error) ||

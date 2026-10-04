@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "profile": {"id": "ad01", "version": "1", "workload": "ad01", "default_backend": "tflite_delegate"},
+  "asset_root": "assets",
+  "model": {
+    "format": "tflite",
+    "file": "model.tflite",
+    "sha256": "87cf24194ef93d1d9b11a591d805526b98008e351655d29883c825c9c106ba24",
+    "provenance": "MLCommons Tiny 4addd0fa08d216e20637637874e084895f289da4 anomaly_detection reference model"
+  },
+  "sample_id": "mlcommons-ad-normal-id01-window-0",
+  "preprocessing_version": "model-ready-logmel-int8-v1",
+  "postprocessing_version": "raw-reconstruction-v1",
+  "inputs": [{
+    "name": "input_1", "dtype": "int8", "shape": [1, 640], "layout": "nc",
+    "quantization": {"mode": "per_tensor", "scales": [0.3910152316093445], "zero_points": [89]},
+    "file": "input.bin", "sha256": "32e1864988e5e2b286ddd998be4ce78f270168a389376fcf1ead97d6885f02c1"
+  }],
+  "outputs": [{
+    "name": "Identity", "dtype": "int8", "shape": [1, 640], "layout": "nc",
+    "quantization": {"mode": "per_tensor", "scales": [0.36449846625328064], "zero_points": [96]}
+  }],
+  "goldens": [],
+  "tolerance": {"mode": "exact", "absolute": 0, "relative": 0}
+}

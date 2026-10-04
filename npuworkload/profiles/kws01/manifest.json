@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "profile": {"id": "kws01", "version": "1", "workload": "kws01", "default_backend": "tflite_delegate"},
+  "asset_root": "assets",
+  "model": {
+    "format": "tflite",
+    "file": "model.tflite",
+    "sha256": "aeea436800704fce17b17292e4412630ad856e9d777c044c64ef748a880bd0ae",
+    "provenance": "MLCommons Tiny 4addd0fa08d216e20637637874e084895f289da4 keyword_spotting reference model"
+  },
+  "sample_id": "mlcommons-kws-reference-0",
+  "preprocessing_version": "model-ready-mfcc-int8-v1",
+  "postprocessing_version": "raw-class-scores-v1",
+  "inputs": [{
+    "name": "input_1", "dtype": "int8", "shape": [1, 49, 10, 1], "layout": "nhwc",
+    "quantization": {"mode": "per_tensor", "scales": [0.5847029089927673], "zero_points": [83]},
+    "file": "input.bin", "sha256": "8250d34f83465b57ce9a4f2d19e163a3568b7d8bf3e0a9507e88066556b0df36"
+  }],
+  "outputs": [{
+    "name": "Identity", "dtype": "int8", "shape": [1, 12], "layout": "nc",
+    "quantization": {"mode": "per_tensor", "scales": [0.00390625], "zero_points": [-128]}
+  }],
+  "goldens": [],
+  "tolerance": {"mode": "exact", "absolute": 0, "relative": 0}
+}

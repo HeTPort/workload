@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "profile": {"id": "ic01", "version": "1", "workload": "ic01", "default_backend": "tflite_delegate"},
+  "asset_root": "assets",
+  "model": {
+    "format": "tflite",
+    "file": "model.tflite",
+    "sha256": "3c002613d1b2475eb51dd78dfb85a546c8ae658dee71cf6ade43b022fe205415",
+    "provenance": "MLCommons Tiny 4addd0fa08d216e20637637874e084895f289da4 image_classification reference model"
+  },
+  "sample_id": "mlcommons-ic-reference-0",
+  "preprocessing_version": "uint8-minus-128-to-model-int8-v1",
+  "postprocessing_version": "raw-class-scores-v1",
+  "inputs": [{
+    "name": "input_1_int8", "dtype": "int8", "shape": [1, 32, 32, 3], "layout": "nhwc",
+    "quantization": {"mode": "per_tensor", "scales": [1.0], "zero_points": [-128]},
+    "file": "input.bin", "sha256": "753412db29fc2970bed80a0cefed2d3caf17b282ed5b9b8707b5c39929a27fce"
+  }],
+  "outputs": [{
+    "name": "Identity_int8", "dtype": "int8", "shape": [1, 10], "layout": "nc",
+    "quantization": {"mode": "per_tensor", "scales": [0.00390625], "zero_points": [-128]}
+  }],
+  "goldens": [],
+  "tolerance": {"mode": "exact", "absolute": 0, "relative": 0}
+}

@@ -13,6 +13,9 @@ struct ProfileSpec {
     std::string version;
     std::string workload;
     std::string default_backend;
+    std::string model_format;
+    std::string model_path;
+    std::string model_sha256;
     std::vector<TensorSpec> inputs;
     std::vector<TensorSpec> outputs;
     bool implemented = false;

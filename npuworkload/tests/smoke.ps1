@@ -6,6 +6,13 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $FrameworkManifest = Join-Path $ProjectRoot "profiles\framework_smoke\manifest.json"
+$ManifestByProfile = @{
+    framework_smoke = $FrameworkManifest
+    kws01 = Join-Path $ProjectRoot "profiles\kws01\manifest.json"
+    ic01 = Join-Path $ProjectRoot "profiles\ic01\manifest.json"
+    ad01 = Join-Path $ProjectRoot "profiles\ad01\manifest.json"
+    sww01 = Join-Path $ProjectRoot "profiles\sww01\manifest.json"
+}
 if (-not $Executable) { $Executable = Join-Path $ProjectRoot "build\desktop-release\npu-avs-workload.exe" }
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $ProjectRoot "build\smoke-results" }
 if (-not (Test-Path -LiteralPath $Executable)) { throw "Benchmark executable not found: $Executable" }
@@ -15,7 +22,8 @@ $ContractExecutable = Join-Path (Split-Path -Parent $Executable) "npu-contract-t
 if (-not (Test-Path -LiteralPath $ContractExecutable)) {
     throw "Contract test executable not found: $ContractExecutable"
 }
-& $ContractExecutable $FrameworkManifest
+& $ContractExecutable $ManifestByProfile.framework_smoke $ManifestByProfile.kws01 `
+    $ManifestByProfile.ic01 $ManifestByProfile.ad01 $ManifestByProfile.sww01
 if ($LASTEXITCODE -ne 0) { throw "contract tests failed with exit $LASTEXITCODE" }
 
 $Profiles = @(& $Executable --list-profiles)
@@ -27,8 +35,11 @@ function Invoke-SmokeCase {
     param([string]$Name, [string[]]$Arguments, [int]$ExpectedExit, [string]$ExpectedResult)
     $OutputPath = Join-Path $OutputDirectory ($Name + ".jsonl")
     $EffectiveArguments = $Arguments
-    if ($Arguments -contains "framework_smoke") {
-        $EffectiveArguments += @("--input-manifest", $FrameworkManifest)
+    foreach ($ProfileName in $ManifestByProfile.Keys) {
+        if ($Arguments -contains $ProfileName -and $Arguments -notcontains "--input-manifest") {
+            $EffectiveArguments += @("--input-manifest", $ManifestByProfile[$ProfileName])
+            break
+        }
     }
     & $Executable @EffectiveArguments --output $OutputPath
     $ActualExit = $LASTEXITCODE
@@ -54,6 +65,28 @@ Invoke-SmokeCase "reference-repeatability" @(
     "--profile", "framework_smoke", "--backend", "reference_cpu", "--duration", "0",
     "--inferences", "5", "--warmup-inferences", "1", "--summary-only"
 ) 0 "PASS"
+
+foreach ($ProfileName in @("kws01", "ic01", "ad01", "sww01")) {
+    Invoke-SmokeCase "$ProfileName-contract" @(
+        "--profile", $ProfileName, "--backend", "null", "--duration", "0", "--inferences", "2",
+        "--warmup-inferences", "0", "--summary-only"
+    ) 0 "PASS"
+}
+
+Invoke-SmokeCase "delegate-runtime-required" @(
+    "--profile", "kws01", "--backend", "tflite_delegate", "--duration", "0",
+    "--inferences", "1", "--warmup-inferences", "0", "--summary-only"
+) 2 "API_ERROR"
+
+$FakeRuntime = Join-Path (Split-Path -Parent $Executable) "npu-fake-tflite-runtime.dll"
+if (Test-Path -LiteralPath $FakeRuntime) {
+    Invoke-SmokeCase "delegate-lifecycle" @(
+        "--profile", "kws01", "--backend", "tflite_delegate", "--duration", "0",
+        "--inferences", "2", "--warmup-inferences", "1", "--runtime-library", $FakeRuntime,
+        "--delegate-library", "fake-vendor-delegate", "--delegate-options", "device=test",
+        "--summary-only"
+    ) 0 "PASS"
+}
 
 Invoke-SmokeCase "checksum-failure" @(
     "--profile", "framework_smoke", "--backend", "reference_cpu", "--duration", "0",

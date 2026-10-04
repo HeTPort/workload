@@ -13,6 +13,9 @@ struct WorkloadConfig {
     std::string workload = "framework_smoke";
     std::string model_path;
     std::string input_manifest;
+    std::string runtime_library;
+    std::string delegate_library;
+    std::string delegate_options;
 
     double duration_s = 60.0;
     uint64_t inferences = 0;

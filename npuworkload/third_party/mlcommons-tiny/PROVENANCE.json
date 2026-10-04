@@ -1,0 +1,23 @@
+{
+  "upstream": "https://github.com/mlcommons/tiny",
+  "commit": "4addd0fa08d216e20637637874e084895f289da4",
+  "license": "Apache-2.0",
+  "assets": {
+    "kws01": {
+      "model": "aeea436800704fce17b17292e4412630ad856e9d777c044c64ef748a880bd0ae",
+      "input": "8250d34f83465b57ce9a4f2d19e163a3568b7d8bf3e0a9507e88066556b0df36"
+    },
+    "ic01": {
+      "model": "3c002613d1b2475eb51dd78dfb85a546c8ae658dee71cf6ade43b022fe205415",
+      "input": "753412db29fc2970bed80a0cefed2d3caf17b282ed5b9b8707b5c39929a27fce"
+    },
+    "ad01": {
+      "model": "87cf24194ef93d1d9b11a591d805526b98008e351655d29883c825c9c106ba24",
+      "input": "32e1864988e5e2b286ddd998be4ce78f270168a389376fcf1ead97d6885f02c1"
+    },
+    "sww01": {
+      "model": "3af8550895ba7d5c584277102b5075c52dcfa63ba9d2b2240f37c4e6abd5dd2b",
+      "input": "af4c1c324e2eade4ed832f9476285ac0ecddb1cb0a4e7fdb0eaecda480b19ad2"
+    }
+  }
+}

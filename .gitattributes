@@ -9,5 +9,6 @@ gpuworkload/src/backends/null/null_backend.cpp text eol=crlf
 gpuworkload/src/backends/opencl/opencl_backend.h text eol=crlf
 gpuworkload/src/backends/vulkan/vulkan_backend.h text eol=crlf
 gpuworkload/src/config.cpp text eol=crlf
-npuworkload/profiles/**/*.bin -text
+npuworkload/profiles/**/*.bin binary
+npuworkload/profiles/**/*.tflite binary
 npuworkload/profiles/**/*.json text eol=lf

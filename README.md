@@ -1,6 +1,6 @@
 # AVS Workloads
 
-This repository contains separate GPU, CPU, and NPU workload projects for AVS low-power evaluation. The NPU project currently provides its portable runner, workload-profile registry, ordered multi-tensor asynchronous backend contract, bounded timeout cleanup, and deterministic framework-test backends; real workload assets and hardware runtime integration follow in later phases.
+This repository contains separate GPU, CPU, and NPU workload projects. The NPU project includes checked KWS01, IC01, AD01, and SWW01 models and inputs, a common ordered-tensor runner, and a generic TensorFlow Lite external-delegate backend for vendor NPU runtimes.
 
 ```text
 .
@@ -20,13 +20,16 @@ This repository contains separate GPU, CPU, and NPU workload projects for AVS lo
 │   ├── build.ps1
 │   └── build.sh
 └── npuworkload/
-    ├── configs/       # NPU baseline profiles
-    ├── docs/          # NPU baseline design
+    ├── configs/       # Framework smoke configurations
+    ├── docs/          # NPU load-generator design
     ├── include/       # npu_avs public/common headers
-    ├── src/           # NPU runner and initial backends
+    ├── profiles/      # Checked models, inputs, and manifests
+    ├── src/           # NPU runner and runtime backends
+    ├── third_party/   # Model provenance and licenses
+    ├── tools/         # Reproducible profile importer
     └── tests/         # NPU smoke tests
 ```
 
 For CPU build and usage instructions, see [cpuworkload/README.md](cpuworkload/README.md) and the [CPU user manual](cpuworkload/docs/user_manual.md).
 
-For the NPU baseline, see [npuworkload/README.md](npuworkload/README.md) and its [design document](npuworkload/docs/design.md).
+For the NPU load generator, see [npuworkload/README.md](npuworkload/README.md) and its [design document](npuworkload/docs/design.md).

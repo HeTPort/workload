@@ -82,7 +82,8 @@ void RequireManifestFailure(const TemporaryFixture& fixture, const std::string& 
 
 int main(int argc, char** argv) {
     try {
-        Require(argc == 2, "usage: npu-contract-tests <framework-manifest>");
+        Require(argc == 6,
+                "usage: npu-contract-tests <framework> <kws01> <ic01> <ad01> <sww01>");
         Require(npu_avs::Sha256Hex("abc") ==
                 "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
                 "SHA-256 standard vector failed");
@@ -118,6 +119,52 @@ int main(int argc, char** argv) {
                 repeated_manifest.tensor_signature_sha256 ==
                     loaded_manifest.tensor_signature_sha256,
                 "manifest hashes changed across loads");
+
+        const char* profile_ids[] = {"kws01", "ic01", "ad01", "sww01"};
+        for (int argument = 2; argument < argc; ++argument) {
+            npu_avs::ProfileManifest workload_manifest;
+            const char* profile_id = profile_ids[argument - 2];
+            Require(npu_avs::LoadProfileManifest(argv[argument], profile_id,
+                                                  workload_manifest, error),
+                    "MLCommons workload manifest failed to load");
+            Require(workload_manifest.profile.implemented,
+                    "MLCommons workload profile is not implemented");
+            Require(workload_manifest.profile.model_format == "tflite" &&
+                    !workload_manifest.profile.model_path.empty() &&
+                    workload_manifest.profile.model_sha256.size() == 64U,
+                    "MLCommons workload model metadata is incomplete");
+            Require(workload_manifest.tensor_signature_sha256 ==
+                    npu_avs::ComputeTensorSignatureSha256(workload_manifest.profile),
+                    "MLCommons tensor signature is unstable");
+
+            npu_avs::WorkloadConfig workload_cfg;
+            Require(npu_avs::ApplyProfileDefaults(profile_id, workload_cfg),
+                    "MLCommons profile defaults failed");
+            workload_cfg.backend = "null";
+            npu_avs::NullBackend workload_backend;
+            Require(workload_backend.Init(workload_cfg, workload_manifest.profile, error) ==
+                    npu_avs::BackendStatus::Ok,
+                    "null backend rejected an MLCommons profile");
+            Require(workload_backend.CreateResources(error) == npu_avs::BackendStatus::Ok,
+                    "null backend resource creation failed for an MLCommons profile");
+            Require(workload_backend.SetInputs(workload_manifest.inputs, error) ==
+                    npu_avs::BackendStatus::Ok,
+                    "null backend rejected an MLCommons input tensor");
+            Require(workload_backend.SubmitInference(0, error) == npu_avs::BackendStatus::Ok,
+                    "null backend submission failed for an MLCommons profile");
+            Require(workload_backend.WaitForCompletion(1000U, error) ==
+                    npu_avs::BackendStatus::Ok,
+                    "null backend wait failed for an MLCommons profile");
+            npu_avs::InferenceResult workload_result;
+            Require(workload_backend.ReadOutputs(workload_result, error) ==
+                    npu_avs::BackendStatus::Ok,
+                    "null backend output read failed for an MLCommons profile");
+            Require(npu_avs::ValidateTensorSet(workload_result.outputs,
+                                               workload_manifest.profile.outputs, error),
+                    "null backend output contract failed for an MLCommons profile");
+            Require(workload_backend.Destroy(50U, error) == npu_avs::BackendStatus::Ok,
+                    "null backend teardown failed for an MLCommons profile");
+        }
 
         const std::filesystem::path source_manifest =
             std::filesystem::absolute(std::filesystem::u8path(argv[1]));

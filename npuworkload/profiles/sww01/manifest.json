@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "profile": {"id": "sww01", "version": "1", "workload": "sww01", "default_backend": "tflite_delegate"},
+  "asset_root": "assets",
+  "model": {
+    "format": "tflite",
+    "file": "model.tflite",
+    "sha256": "3af8550895ba7d5c584277102b5075c52dcfa63ba9d2b2240f37c4e6abd5dd2b",
+    "provenance": "MLCommons Tiny 4addd0fa08d216e20637637874e084895f289da4 streaming_wakeword reference model"
+  },
+  "sample_id": "mlcommons-sww-calibration-window-0",
+  "preprocessing_version": "model-ready-spectrogram-int8-v1",
+  "postprocessing_version": "raw-class-scores-v1",
+  "inputs": [{
+    "name": "serving_default_input_1:0", "dtype": "int8", "shape": [1, 30, 1, 40], "layout": "nhwc",
+    "quantization": {"mode": "per_tensor", "scales": [0.003701042616739869], "zero_points": [-128]},
+    "file": "input.bin", "sha256": "af4c1c324e2eade4ed832f9476285ac0ecddb1cb0a4e7fdb0eaecda480b19ad2"
+  }],
+  "outputs": [{
+    "name": "StatefulPartitionedCall:0", "dtype": "int8", "shape": [1, 3], "layout": "nc",
+    "quantization": {"mode": "per_tensor", "scales": [0.00390625], "zero_points": [-128]}
+  }],
+  "goldens": [],
+  "tolerance": {"mode": "exact", "absolute": 0, "relative": 0}
+}

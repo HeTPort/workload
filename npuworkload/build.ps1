@@ -30,7 +30,8 @@ if ($Target -eq "desktop" -and -not $CMake) {
         "src/metrics.cpp", "src/profile.cpp", "src/runner.cpp", "src/sha256.cpp",
         "src/tensor.cpp", "src/utils.cpp", "src/verifier.cpp",
         "src/backends/null/null_backend.cpp",
-        "src/backends/reference_cpu/reference_cpu_backend.cpp"
+        "src/backends/reference_cpu/reference_cpu_backend.cpp",
+        "src/backends/tflite_delegate/tflite_delegate_backend.cpp"
     ) | ForEach-Object { Join-Path $ProjectRoot $_ }
     $Output = Join-Path $BuildDirectory "npu-avs-workload.exe"
     $Optimization = if ($Configuration -eq "Release") { "-O2" } else { "-O0" }
@@ -54,6 +55,11 @@ if ($Target -eq "desktop" -and -not $CMake) {
     ) + $ContractSources
     & $Compiler.Source @ContractArguments
     if ($LASTEXITCODE -ne 0) { throw "contract test build failed with exit code $LASTEXITCODE" }
+    $FakeRuntimeOutput = Join-Path $BuildDirectory "npu-fake-tflite-runtime.dll"
+    $FakeRuntimeSource = Join-Path $ProjectRoot "tests/fake_tflite_runtime.cpp"
+    & $Compiler.Source -std=c++17 $Optimization -Wall -Wextra -Wpedantic -shared `
+        -static-libgcc -static-libstdc++ -o $FakeRuntimeOutput $FakeRuntimeSource
+    if ($LASTEXITCODE -ne 0) { throw "fake runtime build failed with exit code $LASTEXITCODE" }
     Write-Host "Built $Output"
 } else {
     if (-not $CMake) { throw "cmake is required for Android and HarmonyOS builds." }

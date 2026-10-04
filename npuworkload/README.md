@@ -1,19 +1,50 @@
-# NPU AVS Workload
+# NPU Workload Generator
 
-This project is the dependency-free contract foundation for NPU AVS workloads. It provides the common runner, configuration precedence, JSONL lifecycle, workload-profile registry, strict profile manifests, checked binary assets, an ordered multi-tensor backend interface, and deterministic `null` and `reference_cpu` framework backends. It does not yet integrate a vendor NPU runtime or a real model.
+This project repeatedly invokes real NPU models through a common workload/profile contract. It includes four MLCommons Tiny profiles with checked TensorFlow Lite models and model-ready input tensors:
 
-Build on Windows with `./build.ps1`, or use CMake directly. When CMake is unavailable, the PowerShell script falls back to a C++17 `g++` build for the desktop target.
+| Profile | Workload | Input | Output |
+|---|---|---|---|
+| `kws01` | Keyword spotting | int8 `[1,49,10,1]` | int8 `[1,12]` |
+| `ic01` | Image classification | int8 `[1,32,32,3]` | int8 `[1,10]` |
+| `ad01` | Anomaly detection | int8 `[1,640]` | int8 `[1,640]` |
+| `sww01` | Streaming-wakeword model window | int8 `[1,30,1,40]` | int8 `[1,3]` |
 
-Quick smoke run:
+The scope is deliberately small: generate repeatable inference load, enforce consistent tensors, and report lifecycle/timing results. It does not control AVS/DVFS, collect power or thermal traces, or implement separate cold/warm/sustained/periodic scenario modes. Warm-up count, duration, inference count, and per-inference timeout already provide the controls needed for load generation.
+
+## Build and host conformance
 
 ```powershell
 ./build.ps1
-./build/desktop-release/npu-avs-workload.exe --profile framework_smoke --backend reference_cpu --input-manifest ./profiles/framework_smoke/manifest.json --duration 0 --inferences 5 --warmup-inferences 1
 ./tests/smoke.ps1
 ```
 
-The backend lifecycle is `Init(profile) -> CreateResources -> SetInputs -> SubmitInference -> WaitForCompletion -> ReadOutputs -> Destroy`. The runner obtains the active tensor contract and input bytes from `--input-manifest`; it does not synthesize workload inputs. Inputs and outputs are ordered tensor sets validated against that contract. Asynchronous work uses bounded cancellation and teardown; a timeout does not perform an unbounded future join.
+The `null` backend checks a profile and its assets without requiring a device runtime:
 
-`kws01`, `ic01`, `ad01`, and `sww01` are registered workload identities. They intentionally return `UNSUPPORTED_PROFILE` until their real manifests, assets, and backend profile executors are added. `framework_smoke` has a repository-owned manifest and two hashed input fixtures; it exercises two inputs and two outputs with both included backends. The `reference_cpu` implementation remains a deterministic framework test, not an accuracy reference or NPU performance result.
+```powershell
+./build/desktop-release/npu-avs-workload.exe `
+  --profile kws01 --backend null `
+  --input-manifest ./profiles/kws01/manifest.json `
+  --duration 0 --inferences 10 --warmup-inferences 0
+```
 
-See [docs/design.md](docs/design.md) for the delivered design and current limitations, and [docs/manifest.md](docs/manifest.md) for the manifest contract.
+## NPU execution
+
+`tflite_delegate` dynamically loads the public TensorFlow Lite C API and its external-delegate loader. Supply the TensorFlow Lite runtime library and the target vendor's external-delegate library:
+
+```powershell
+./build/desktop-release/npu-avs-workload.exe `
+  --profile kws01 --backend tflite_delegate `
+  --input-manifest ./profiles/kws01/manifest.json `
+  --runtime-library C:/runtime/tensorflowlite_c.dll `
+  --delegate-library C:/runtime/vendor_npu_delegate.dll `
+  --delegate-options "key=value;other=value" `
+  --duration 60 --warmup-inferences 1
+```
+
+Both libraries are required. Delegate creation, interpreter creation, tensor allocation, or invocation failure stops the run; the tool never retries without the delegate. A delegate can still partition unsupported operators according to its own policy, so vendor tooling is the authority for proving complete NPU placement.
+
+The backend lifecycle is `Init -> CreateResources -> SetInputs -> SubmitInference -> WaitForCompletion -> ReadOutputs -> Destroy`. Every backend receives the same ordered tensor descriptors and bytes from the selected manifest. `framework_smoke` and `reference_cpu` remain test-only framework fixtures.
+
+Models and samples are pinned to MLCommons Tiny commit `4addd0fa08d216e20637637874e084895f289da4`. See `third_party/mlcommons-tiny/PROVENANCE.json` and `LICENSE.md`. The standard-library-only importer at `tools/import_mlcommons_profiles.py` reproducibly checks upstream hashes and recreates the checked assets.
+
+See [docs/design.md](docs/design.md) for architecture and [docs/manifest.md](docs/manifest.md) for the manifest schema.
