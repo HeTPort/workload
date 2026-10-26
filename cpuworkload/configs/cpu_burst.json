@@ -13,7 +13,8 @@
   "burst_period": 2,
   "burst_active": 1,
   "verify_mode": "checksum",
-  "checksum_interval": 60,
+  "verify_interval": 1,
+  "success_log_interval": 60,
   "heartbeat_interval": 1,
   "output_format": "jsonl"
 }

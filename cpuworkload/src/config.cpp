@@ -1,4 +1,5 @@
 #include "cpu_avs/config.h"
+#include "avs/contract.h"
 
 #include "cpu_avs/profile.h"
 #include "cpu_avs/utils.h"
@@ -23,7 +24,7 @@ bool LooksLikeOption(const std::string& value) {
 
 bool IsAlwaysFlag(const std::string& key) {
     return key == "--help" || key == "-h" || key == "--version" ||
-           key == "--list-profiles" || key == "--dump-effective-config";
+           key == "--list-profiles" || key == "--dump-effective-config" || key == "--capabilities";
 }
 
 bool IsOptionalBoolFlag(const std::string& key) {
@@ -35,8 +36,10 @@ bool IsOptionalBoolFlag(const std::string& key) {
 std::unordered_map<std::string, std::string> ParseCliMap(
     int argc, char** argv, std::string& error) {
     std::unordered_map<std::string, std::string> values;
+    bool seen_verify_interval = false;
     for (int i = 1; i < argc; ++i) {
         const std::string key = argv[i];
+        if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return {};
         if (!LooksLikeOption(key)) {
             error = "unexpected argument: " + key;
             return {};
@@ -130,7 +133,9 @@ bool ApplyKeyValue(WorkloadConfig& cfg, const std::string& key, const std::strin
     else if (key == "burst-active" || key == "burst_active") cfg.burst_active_s = ToDouble(value);
 
     else if (key == "verify-mode" || key == "verify_mode") cfg.verify_mode = value;
-    else if (key == "checksum-interval" || key == "checksum_interval") cfg.checksum_interval = ToU32(value);
+    else if (key == "verify-interval" || key == "verify_interval" ||
+             key == "checksum-interval" || key == "checksum_interval") cfg.verify_interval = ToU32(value);
+    else if (key == "success-log-interval" || key == "success_log_interval") cfg.success_log_interval = ToU32(value);
     else if (key == "golden-checksum" || key == "golden_checksum") cfg.golden_checksum = value;
     else if (key == "fail-fast" || key == "fail_fast") ApplyBool(cfg.fail_fast, value);
     else if (key == "generate-golden" || key == "generate_golden") ApplyBool(cfg.generate_golden, value);
@@ -191,6 +196,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
     std::ostringstream buffer;
     buffer << input.rdbuf();
     const std::string text = buffer.str();
+    bool seen_verify_interval = false;
     const std::regex key_value(
         "\"([A-Za-z0-9_\\-]+)\"\\s*:\\s*"
         "(\"([^\"]*)\"|true|false|null|-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)");
@@ -199,6 +205,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
         for (auto it = std::sregex_iterator(text.begin(), text.end(), key_value);
              it != std::sregex_iterator(); ++it) {
             const std::string key = (*it)[1].str();
+            if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return false;
             const std::string raw = (*it)[2].str();
             std::string value = raw;
             if (raw.size() >= 2 && raw.front() == '"' && raw.back() == '"') {
@@ -256,6 +263,10 @@ bool ValidateConfig(const WorkloadConfig& cfg, std::string& error) {
         error = "unsupported verify mode: " + cfg.verify_mode;
         return false;
     }
+    if (cfg.verify_mode != "none" && cfg.verify_interval == 0) {
+        error = "verify-interval must be positive when verification is enabled";
+        return false;
+    }
     if (!cfg.golden_checksum.empty()) {
         std::string checksum = cfg.golden_checksum;
         if (checksum.rfind("0x", 0) == 0 || checksum.rfind("0X", 0) == 0) checksum.erase(0, 2);
@@ -283,6 +294,10 @@ bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& e
     }
     if (cli.count("--version")) {
         cfg.show_version = true;
+        return true;
+    }
+    if (cli.count("--capabilities")) {
+        cfg.show_capabilities = true;
         return true;
     }
 
@@ -345,7 +360,8 @@ void DumpEffectiveConfig(const WorkloadConfig& cfg) {
               << "\"burst_period_s\":" << cfg.burst_period_s << ','
               << "\"burst_active_s\":" << cfg.burst_active_s << ','
               << "\"verify_mode\":\"" << JsonEscape(cfg.verify_mode) << "\","
-              << "\"checksum_interval\":" << cfg.checksum_interval << ','
+              << "\"verify_interval\":" << cfg.verify_interval << ','
+              << "\"success_log_interval\":" << cfg.success_log_interval << ','
               << "\"batch_timeout_ms\":" << cfg.batch_timeout_ms << ','
               << "\"heartbeat_interval_s\":" << cfg.heartbeat_interval_s << ','
               << "\"output_format\":\"" << JsonEscape(cfg.output_format) << "\","
@@ -389,7 +405,9 @@ Runtime:
 
 Verification:
   --verify-mode <none|checksum|crc>
-  --checksum-interval <batches>
+  --verify-interval <batches>    Work units between actual checks
+  --success-log-interval <N>     Successful checks between verify logs; 0 suppresses them
+  --checksum-interval <batches>  Deprecated alias for --verify-interval
   --golden-checksum <hex>
   --fail-fast <bool>
   --generate-golden[=<bool>]
@@ -411,11 +429,16 @@ Utility:
   --dump-effective-config
   --help, -h
   --version
+  --capabilities                 JSON verification contract and supported modes
 )";
 }
 
 void PrintVersion() {
-    std::cout << "cpu-avs-workload 1.0.0\n";
+    std::cout << "cpu-avs-workload " << avs::kVersion << "\n";
+}
+
+void PrintCapabilities() {
+    std::cout << R"({"workload":"cpu","version":"2.1.0","contract_version":2,"features":["verify_interval","success_log_interval","verify_count","failure_verify","live_heartbeat","success_log_rate_limit"],"success_log_min_period_ms":1000,"verify_modes":["none","checksum","crc"]})" << '\n';
 }
 
 } // namespace cpu_avs

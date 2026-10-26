@@ -2,3 +2,6 @@
 /cpuworkload/build/
 /cpuworkload/.legacy-build/
 /npuworkload/build/
+# Python helpers used by the unified build entry.
+__pycache__/
+*.py[cod]

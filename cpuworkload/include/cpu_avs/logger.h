@@ -1,4 +1,5 @@
 #pragma once
+#include "avs/verify_schedule.h"
 
 #include "cpu_avs/config.h"
 #include "cpu_avs/metrics.h"
@@ -50,6 +51,7 @@ struct SummaryData {
     StatSummary throughput;
 
     bool verify_pass = true;
+    uint64_t verify_count = 0;
     uint64_t verify_fail_count = 0;
     int64_t first_fail_batch = -1;
     std::string checksum;
@@ -92,6 +94,7 @@ private:
     std::ostream* out_ = nullptr;
     mutable std::mutex mutex_;
     uint64_t last_heartbeat_time_ms_ = 0;
+    avs::SuccessLogRateLimit success_log_rate_limit_;
 };
 
 } // namespace cpu_avs

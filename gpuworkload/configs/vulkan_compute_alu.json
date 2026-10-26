@@ -16,7 +16,8 @@
   "texture_count": 1,
 
   "verify_mode": "none",
-  "checksum_interval": 30,
+  "verify_interval": 30,
+  "success_log_interval": 1,
 
   "gpu_timestamp": true,
   "gpu_timeout_ms": 5000,

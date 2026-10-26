@@ -790,7 +790,7 @@ bool VulkanGraphicsBackend::CreateDescriptorResources(std::string& error) {
     write.dstBinding = 0;
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write.pImageInfo = &ii；
+    write.pImageInfo = &ii;
 
     vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
     return true;

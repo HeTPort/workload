@@ -58,7 +58,8 @@ static void DumpEffectiveConfig(const WorkloadConfig& cfg) {
         << "\"burst_active_s\":" << cfg.burst_active_s << ","
 
         << "\"verify_mode\":\"" << JsonEscape(cfg.verify_mode) << "\","
-        << "\"checksum_interval\":" << cfg.checksum_interval << ","
+        << "\"verify_interval\":" << cfg.verify_interval << ","
+        << "\"success_log_interval\":" << cfg.success_log_interval << ","
         << "\"golden_checksum\":\"" << JsonEscape(cfg.golden_checksum) << "\","
         << "\"golden_file\":\"" << JsonEscape(cfg.golden_file) << "\","
         << "\"fail_fast\":" << (cfg.fail_fast ? "true" : "false") << ","
@@ -93,6 +94,10 @@ int main(int argc, char** argv) {
 
     if (cfg.show_version) {
         PrintVersion();
+        return 0;
+    }
+    if (cfg.show_capabilities) {
+        PrintCapabilities();
         return 0;
     }
 

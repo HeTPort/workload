@@ -21,7 +21,8 @@
   "duty_cycle": 1.0,
 
   "verify_mode": "none",
-  "checksum_interval": 60,
+  "verify_interval": 60,
+  "success_log_interval": 1,
 
   "gpu_timestamp": true,
   "timestamp_scope": "frame",

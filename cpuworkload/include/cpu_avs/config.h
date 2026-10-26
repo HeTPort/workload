@@ -28,7 +28,8 @@ struct WorkloadConfig {
     double burst_active_s = 1.0;
 
     std::string verify_mode = "checksum";
-    uint32_t checksum_interval = 1;
+    uint32_t verify_interval = 1;
+    uint32_t success_log_interval = 60;
     std::string golden_checksum;
     bool fail_fast = true;
     bool generate_golden = false;
@@ -62,6 +63,7 @@ struct WorkloadConfig {
     bool dump_effective_config = false;
     bool show_help = false;
     bool show_version = false;
+    bool show_capabilities = false;
 };
 
 bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& error);
@@ -70,5 +72,6 @@ bool ValidateConfig(const WorkloadConfig& cfg, std::string& error);
 void DumpEffectiveConfig(const WorkloadConfig& cfg);
 void PrintHelp();
 void PrintVersion();
+void PrintCapabilities();
 
 } // namespace cpu_avs

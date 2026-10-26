@@ -1,66 +1,32 @@
-# NPU Workload Generator
+# NPU 压力负载
 
-This project repeatedly invokes real NPU models through a common workload/profile contract. It includes four MLCommons Tiny profiles with checked TensorFlow Lite models and model-ready input tensors:
+NPU 负载反复调用固定模型，提供运行生命周期、实际校验计数、心跳、耗时和 JSONL 汇总。它不控制电压/频率，不采集功耗/温度，也不证明完整 NPU 算子放置。
 
-| Profile | Workload | Input | Output |
+| 模型 | 工作 | INT8 输入 | INT8 输出 |
 |---|---|---|---|
-| `kws01` | Keyword spotting | int8 `[1,49,10,1]` | int8 `[1,12]` |
-| `ic01` | Image classification | int8 `[1,32,32,3]` | int8 `[1,10]` |
-| `ad01` | Anomaly detection | int8 `[1,640]` | int8 `[1,640]` |
-| `sww01` | Streaming-wakeword model window | int8 `[1,30,1,40]` | int8 `[1,3]` |
+| kws01 | 关键词识别 | [1,49,10,1] | [1,12] |
+| ic01 | 图像分类 | [1,32,32,3] | [1,10] |
+| ad01 | 异常检测 | [1,640] | [1,640] |
+| sww01 | 唤醒词单窗口 | [1,30,1,40] | [1,3] |
 
-The scope is deliberately small: generate repeatable inference load, enforce consistent tensors, and report lifecycle/timing results. It does not control AVS/DVFS, collect power or thermal traces, or implement separate cold/warm/sustained/periodic scenario modes. Warm-up count, duration, inference count, and per-inference timeout already provide the controls needed for load generation.
+模型和输入固定自 MLCommons Tiny 提交 4addd0fa08d216e20637637874e084895f289da4，来源/许可见 third_party/mlcommons-tiny。输入处于模型张量边界，不包含实时采音、图像解码或完整应用链路。
 
-## Build and host conformance
-
-```powershell
-./build.ps1
-./tests/smoke.ps1
-```
-
-The `null` backend checks a profile and its assets without requiring a device runtime:
+从仓库根目录使用集中编译：
 
 ```powershell
-./build/desktop-release/npu-avs-workload.exe `
-  --profile kws01 --backend null `
-  --input-manifest ./profiles/kws01/manifest.json `
-  --duration 0 --inferences 10 --warmup-inferences 0
+.\build.ps1 --components npu --target host --engine direct --test
 ```
 
-## NPU execution
+Linux 使用 `sh build.sh --components npu --target host --engine direct --test`。子项目旧 build.ps1/build.sh 继续可用。host 只生成当前主机产物；板端需要对应 Android/OHOS NDK。详细条件见 ../docs/zh/编译指南.md。
 
-`tflite_delegate` dynamically loads the public TensorFlow Lite C API and its external-delegate loader. Supply the TensorFlow Lite runtime library and the target vendor's external-delegate library:
+null 验证资产和框架，reference_cpu 只用于 framework_smoke 夹具。真实模型用 tflite_delegate，并要求 --runtime-library 与 --delegate-library（和可选 --delegate-options）。动态加载、创建、张量分配或调用失败时停止，不自动去掉 delegate 重试。但 delegate 自身可能仅接管部分算子，完整 NPU 执行须由厂商诊断确认。
 
-```powershell
-./build/desktop-release/npu-avs-workload.exe `
-  --profile kws01 --backend tflite_delegate `
-  --input-manifest ./profiles/kws01/manifest.json `
-  --runtime-library C:/runtime/tensorflowlite_c.dll `
-  --delegate-library C:/runtime/vendor_npu_delegate.dll `
-  --delegate-options "key=value;other=value" `
-  --duration 60 --warmup-inferences 1
-```
+`--capabilities` 无需初始化后端，输出 verification contract 2、支持模型/后端和成功日志上限。verify_interval 控制真实校验次数；success_log_interval 控制成功事件采样（0 关闭），并限制最多每秒一条；失败立即输出 pass=false/result=FAIL。预热和 golden 生成不进入正式 inference_count/verify_count。配置使用严格 JSON，拒绝重复键、非法类型和冲突别名。
 
-Both libraries are required. Delegate creation, interpreter creation, tensor allocation, or invocation failure stops the run; the tool never retries without the delegate. A delegate can still partition unsupported operators according to its own policy, so vendor tooling is the authority for proving complete NPU placement.
-
-The backend lifecycle is `Init -> CreateResources -> SetInputs -> SubmitInference -> WaitForCompletion -> ReadOutputs -> Destroy`. Every backend receives the same ordered tensor descriptors and bytes from the selected manifest. `framework_smoke` and `reference_cpu` remain test-only framework fixtures.
-
-Models and samples are pinned to MLCommons Tiny commit `4addd0fa08d216e20637637874e084895f289da4`. See `third_party/mlcommons-tiny/PROVENANCE.json` and `LICENSE.md`. The standard-library-only importer at `tools/import_mlcommons_profiles.py` reproducibly checks upstream hashes and recreates the checked assets.
-
-See [docs/design.md](docs/design.md) for architecture and [docs/manifest.md](docs/manifest.md) for the manifest schema.
-
-## Monitor verification contract v2 (NPU 0.4.0)
-
-`--capabilities` prints one JSON object without loading a runtime or executing inference. It advertises model profiles/backends, verification modes, actual check counting, failure events, live progress heartbeat and a 1000ms minimum successful-log period. Native event schema remains 1; Monitor UART framing is a separate protocol.
-
-`verify_interval` controls actual checks at measured inference multiples. `success_log_interval` controls successful-check sampling: emit the first and every Nth subsequent success, with a separate one-second rate limit; 0 disables successes. Failed checks always emit with both `result` and boolean `pass`. Warm-up and golden generation do not increment measured `inference_count` or `verify_count`. Normal completion exposes real counts plus effective intervals and `contract_version: 2` in summary; early failure retains actual partial counts. No background heartbeat hides stalled inference.
-
-Configs now use the existing strict JSON parser, reject duplicate keys, invalid scalar types and conflicting aliases, and decode escaped file paths correctly. `--success-log-interval` and `--capabilities` are documented in `--help`.
-
-Additional native protocol tests:
+额外原生协议测试：
 
 ```powershell
 python tests/test_monitor_contract.py --executable build/desktop-release/npu-avs-workload.exe -v
 ```
 
-On Linux use the Linux executable path. These tests exercise null and a fake TensorFlow Lite runtime; they cannot certify actual NPU placement, thermal behavior or AVS operating points. CPU/GPU C++ sources are unchanged by this NPU extension. Paired Monitor source is based on `74bc567` with the `codex/npu-monitor-integration` changes; use its NPU guide for managed assets, explicit known-good golden approval and vendor execution evidence.
+从本目录运行上述命令；集中构建的产物使用对应 build-manifest 记录的路径。null/fake runtime 测试不执行真实模型推理，不能认证 NPU 正确性或物理 AVS 条件。Monitor 侧部署、golden、位置证据与资格化见同级 npu-monitor/docs/NPU_USER_GUIDE.md（中文）。

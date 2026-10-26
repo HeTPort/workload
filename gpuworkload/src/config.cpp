@@ -1,4 +1,5 @@
 #include "gpu_avs/config.h"
+#include "avs/contract.h"
 #include "gpu_avs/profile.h"
 #include "gpu_avs/utils.h"
 
@@ -19,7 +20,7 @@ static bool IsAlwaysFlagOnlyArg(const std::string& key) {
            key == "--dump-effective-config" ||
            key == "--help" ||
            key == "-h" ||
-           key == "--version";
+           key == "--version" || key == "--capabilities";
 }
 
 static bool IsOptionalBoolFlagArg(const std::string& key) {
@@ -43,9 +44,11 @@ static std::unordered_map<std::string, std::string> ParseCliMap(
     std::string& error
 ) {
     std::unordered_map<std::string, std::string> m;
+    bool seen_verify_interval = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string key = argv[i];
+        if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return {};
 
         if (!LooksLikeOption(key)) {
             error = "unexpected argument: " + key;
@@ -174,7 +177,9 @@ static bool ApplyKeyValue(
     else if (key == "burst-active" || key == "burst_active") cfg.burst_active_s = ToDouble(value);
 
     else if (key == "verify-mode" || key == "verify_mode") cfg.verify_mode = value;
-    else if (key == "checksum-interval" || key == "checksum_interval") cfg.checksum_interval = ToU32(value);
+    else if (key == "verify-interval" || key == "verify_interval" ||
+             key == "checksum-interval" || key == "checksum_interval") cfg.verify_interval = ToU32(value);
+    else if (key == "success-log-interval" || key == "success_log_interval") cfg.success_log_interval = ToU32(value);
     else if (key == "golden-checksum" || key == "golden_checksum") cfg.golden_checksum = value;
     else if (key == "golden-file" || key == "golden_file") cfg.golden_file = value;
     else if (key == "pixel-threshold" || key == "pixel_threshold") cfg.pixel_threshold = ToDouble(value);
@@ -207,6 +212,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
     std::stringstream ss;
     ss << in.rdbuf();
     std::string text = ss.str();
+    bool seen_verify_interval = false;
 
     std::regex kv_regex(
         "\"([A-Za-z0-9_\\-]+)\"\\s*:\\s*"
@@ -219,6 +225,7 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
     try {
         for (auto it = begin; it != end; ++it) {
             std::string key = (*it)[1].str();
+            if (!avs::CheckVerifyIntervalKey(key, seen_verify_interval, error)) return false;
             std::string raw = (*it)[2].str();
             std::string val = raw;
 
@@ -256,6 +263,10 @@ bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& e
 
     if (cli.count("--version")) {
         cfg.show_version = true;
+        return true;
+    }
+    if (cli.count("--capabilities")) {
+        cfg.show_capabilities = true;
         return true;
     }
 
@@ -329,6 +340,11 @@ bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& e
         effective.timeout_s = effective.warmup_s + effective.duration_s + 30.0;
     }
 
+    if (effective.verify_mode != "none" && effective.verify_interval == 0) {
+        error = "verify-interval must be positive when verification is enabled";
+        return false;
+    }
+
     cfg = effective;
     return true;
 }
@@ -372,7 +388,9 @@ Load:
 
 Verify:
   --verify-mode <none|crc|checksum|golden-image|pixel-diff|compute-compare>
-  --checksum-interval <N>
+  --verify-interval <frames>     Work units between actual checks
+  --success-log-interval <N>     Successful checks between verify logs; 0 suppresses them
+  --checksum-interval <frames>   Deprecated alias for --verify-interval
   --golden-checksum <hex>
   --golden-file <path>
   --pixel-threshold <value>
@@ -398,11 +416,16 @@ Utility:
   --dump-effective-config
   --help
   --version
+  --capabilities                 JSON verification contract and supported modes
 )";
 }
 
 void PrintVersion() {
-    std::cout << "gpu-avs-workload version 0.5.0\n";
+    std::cout << "gpu-avs-workload " << avs::kVersion << "\n";
+}
+
+void PrintCapabilities() {
+    std::cout << R"({"workload":"gpu","version":"2.1.0","contract_version":2,"features":["verify_interval","success_log_interval","verify_count","failure_verify","live_heartbeat","success_log_rate_limit"],"success_log_min_period_ms":1000,"verify_modes":["none","crc","checksum","golden-image","pixel-diff","compute-compare"]})" << '\n';
 }
 
 } // namespace gpu_avs

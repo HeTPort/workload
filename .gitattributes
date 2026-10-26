@@ -12,3 +12,6 @@ gpuworkload/src/config.cpp text eol=crlf
 npuworkload/profiles/**/*.bin binary
 npuworkload/profiles/**/*.tflite binary
 npuworkload/profiles/**/*.json text eol=lf
+
+# Keep the shared verification schedule byte-identical on Windows and Linux.
+*/include/avs/verify_schedule.h text eol=lf

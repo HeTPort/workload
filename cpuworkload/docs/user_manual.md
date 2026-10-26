@@ -120,7 +120,9 @@ Configure `burst_active / burst_period` to match `duty_cycle`. The runtime uses 
 | CLI | JSON key | Default | Description |
 |---|---|---:|---|
 | `--verify-mode <mode>` | `verify_mode` | `checksum` | `none`, `checksum`, or `crc`. |
-| `--checksum-interval <n>` | `checksum_interval` | `1` | Emit successful verify events every n batches. Every batch is checked internally; zero suppresses successful events. |
+| `--verify-interval <n>` | `verify_interval` | `1` | Perform an actual verification every n batches. Must be positive when verification is enabled. |
+| `--success-log-interval <n>` | `success_log_interval` | `60` | Select first success, then every n further successes; a 1-second minimum spacing can drop later candidates. Zero suppresses successes, never failures. |
+| `--checksum-interval <n>` | `checksum_interval` | — | Deprecated alias for `verify_interval`, retained for compatibility with older launchers. |
 | `--golden-checksum <hex>` | `golden_checksum` | empty | Replace the derived expected result. Checksum accepts 16 hex digits; CRC accepts 8; `0x` is optional. |
 | `--fail-fast <bool>` | `fail_fast` | `true` | Stop at first mismatch. |
 | `--generate-golden[=<bool>]` | `generate_golden` | `false` | Run one batch, emit golden/summary, and exit. |
@@ -134,7 +136,7 @@ Checksum mode emits 16 hex digits. CRC mode calculates CRC32 over the 64-bit ker
 | `--heartbeat-interval <sec>` | `heartbeat_interval` | `1.0` | Target heartbeat interval; zero disables it. |
 | `--output-format jsonl` | `output_format` | `jsonl` | Only JSONL is supported. |
 | `--output <path>` | `output` | empty | File output; otherwise stdout. |
-| `--summary-only[=<bool>]` | `summary_only` | `false` | Suppress normal events but retain error/summary. |
+| `--summary-only[=<bool>]` | `summary_only` | `false` | Suppress start/success/per-batch diagnostics; retain actual-progress heartbeats, failed verify, error, golden and summary. |
 | `--per-batch-log[=<bool>]` | `per_batch_log` | `false` | Emit every batch. |
 | `--per-frame-log[=<bool>]` | `per_frame_log` | — | Legacy per-batch alias. |
 | `--log-level <name>` | `log_level` | `info` | Reserved metadata. |
@@ -430,7 +432,7 @@ Correctness/liveness run without performance gating:
 ```sh
 cpu-avs-workload \
   --profile mixed --duration 60 --warmup 5 --threads 4 \
-  --heartbeat-interval 1 --checksum-interval 60
+  --heartbeat-interval 1 --verify-interval 1 --success-log-interval 60
 ```
 
 Controlled stability run:

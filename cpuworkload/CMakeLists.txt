@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(cpu_avs_workload VERSION 1.0.0 LANGUAGES CXX)
+project(cpu_avs_workload VERSION 2.1.0 LANGUAGES CXX)
 
 option(CPU_AVS_STATIC_CXX_RUNTIME "Link the compiler C++ runtime statically when supported" ON)
 
@@ -54,7 +54,7 @@ install(TARGETS cpu-avs-workload RUNTIME DESTINATION bin)
 
 if(BUILD_TESTING)
     add_test(NAME cpu_avs_version COMMAND cpu-avs-workload --version)
-    set_tests_properties(cpu_avs_version PROPERTIES PASS_REGULAR_EXPRESSION "cpu-avs-workload 1.0.0")
+    set_tests_properties(cpu_avs_version PROPERTIES PASS_REGULAR_EXPRESSION "cpu-avs-workload 2.1.0")
 
     add_test(NAME cpu_avs_integer_smoke COMMAND cpu-avs-workload
         --profile integer --duration 0 --batches 2 --warmup 0 --summary-only)

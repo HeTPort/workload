@@ -21,6 +21,10 @@ int main(int argc, char** argv) {
         cpu_avs::PrintVersion();
         return 0;
     }
+    if (cfg.show_capabilities) {
+        cpu_avs::PrintCapabilities();
+        return 0;
+    }
     if (cfg.list_profiles) {
         cpu_avs::PrintProfiles();
         return 0;
