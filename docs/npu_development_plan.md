@@ -41,3 +41,5 @@ The public tensor contract is `TensorSet`: an ordered array of named buffers des
 ## Device integration boundary
 
 To run on a specific NPU, provide a TensorFlow Lite C runtime that exports the external-delegate API, the vendor delegate shared library, and any vendor delegate options. If a platform does not expose a TensorFlow Lite external delegate, add a backend adapter for that concrete runtime while preserving the existing profile descriptors and `INpuBackend` lifecycle. No other core work is required for the generic load-generator scope.
+
+Monitor contract v2 source changes are confined to `npuworkload/`. Validation for the Monitor integration pair used Windows and Linux native builds, 11 additional protocol tests on each host, the existing 13-case Windows smoke suite, and all five manifest contracts. Null/fake delegate runs establish software conformance only. The paired Monitor checkout contains the detailed NPU asset/known-good/vendor-evidence guide and hardware acceptance record.

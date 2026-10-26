@@ -1,4 +1,5 @@
 #include "npu_avs/logger.h"
+#include "npu_avs/utils.h"
 
 #include <iomanip>
 #include <iostream>
@@ -120,12 +121,13 @@ void Logger::EmitInference(uint64_t inference, const InferenceResult& result,
 }
 
 void Logger::EmitVerify(const VerifyData& data) {
-    if (cfg_.summary_only) return;
+    if (data.pass && (cfg_.summary_only || cfg_.success_log_interval == 0 || !success_log_rate_limit_.Allow(NowMs()))) return;
     std::ostringstream os;
     os << "{\"type\":\"verify\",\"inference\":" << data.inference
        << ",\"verify_mode\":\"" << JsonEscape(data.verify_mode) << "\""
        << ",\"checksum\":\"" << JsonEscape(data.checksum) << "\""
        << ",\"golden_checksum\":\"" << JsonEscape(data.golden_checksum) << "\""
+       << ",\"pass\":" << (data.pass ? "true" : "false")
        << ",\"result\":\"" << (data.pass ? "PASS" : "FAIL") << "\""
        << ",\"mismatch_count\":" << data.mismatch_count
        << ",\"message\":\"" << JsonEscape(data.message) << "\"}";
@@ -192,6 +194,10 @@ void Logger::EmitSummary(const SummaryData& summary) {
 
     os << "\"verify_pass\":" << (summary.verify_pass ? "true" : "false")
        << ",\"verify_mode\":\"" << JsonEscape(summary.config.verify_mode) << "\""
+       << ",\"contract_version\":2"
+       << ",\"verify_interval\":" << summary.config.verify_interval
+       << ",\"success_log_interval\":" << summary.config.success_log_interval
+       << ",\"verify_count\":" << summary.verify_count
        << ",\"verify_fail_count\":" << summary.verify_fail_count
        << ",\"first_fail_inference\":" << summary.first_fail_inference
        << ",\"checksum\":\"" << JsonEscape(summary.checksum) << "\""

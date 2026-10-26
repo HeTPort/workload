@@ -48,3 +48,19 @@ The backend lifecycle is `Init -> CreateResources -> SetInputs -> SubmitInferenc
 Models and samples are pinned to MLCommons Tiny commit `4addd0fa08d216e20637637874e084895f289da4`. See `third_party/mlcommons-tiny/PROVENANCE.json` and `LICENSE.md`. The standard-library-only importer at `tools/import_mlcommons_profiles.py` reproducibly checks upstream hashes and recreates the checked assets.
 
 See [docs/design.md](docs/design.md) for architecture and [docs/manifest.md](docs/manifest.md) for the manifest schema.
+
+## Monitor verification contract v2 (NPU 0.4.0)
+
+`--capabilities` prints one JSON object without loading a runtime or executing inference. It advertises model profiles/backends, verification modes, actual check counting, failure events, live progress heartbeat and a 1000ms minimum successful-log period. Native event schema remains 1; Monitor UART framing is a separate protocol.
+
+`verify_interval` controls actual checks at measured inference multiples. `success_log_interval` controls successful-check sampling: emit the first and every Nth subsequent success, with a separate one-second rate limit; 0 disables successes. Failed checks always emit with both `result` and boolean `pass`. Warm-up and golden generation do not increment measured `inference_count` or `verify_count`. Normal completion exposes real counts plus effective intervals and `contract_version: 2` in summary; early failure retains actual partial counts. No background heartbeat hides stalled inference.
+
+Configs now use the existing strict JSON parser, reject duplicate keys, invalid scalar types and conflicting aliases, and decode escaped file paths correctly. `--success-log-interval` and `--capabilities` are documented in `--help`.
+
+Additional native protocol tests:
+
+```powershell
+python tests/test_monitor_contract.py --executable build/desktop-release/npu-avs-workload.exe -v
+```
+
+On Linux use the Linux executable path. These tests exercise null and a fake TensorFlow Lite runtime; they cannot certify actual NPU placement, thermal behavior or AVS operating points. CPU/GPU C++ sources are unchanged by this NPU extension. Paired Monitor source is based on `74bc567` with the `codex/npu-monitor-integration` changes; use its NPU guide for managed assets, explicit known-good golden approval and vendor execution evidence.

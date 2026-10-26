@@ -1,6 +1,7 @@
 #include "npu_avs/config.h"
 
 #include "npu_avs/profile.h"
+#include "npu_avs/json.h"
 #include "npu_avs/utils.h"
 
 #include <algorithm>
@@ -23,7 +24,7 @@ bool LooksLikeOption(const std::string& value) {
 
 bool IsAlwaysFlag(const std::string& key) {
     return key == "--help" || key == "-h" || key == "--version" ||
-           key == "--list-profiles" || key == "--dump-effective-config";
+           key == "--capabilities" || key == "--list-profiles" || key == "--dump-effective-config";
 }
 
 bool IsOptionalBoolFlag(const std::string& key) {
@@ -121,6 +122,7 @@ bool ApplyKeyValue(WorkloadConfig& cfg, const std::string& key, const std::strin
     else if (key == "verify-mode" || key == "verify_mode") cfg.verify_mode = value;
     else if (key == "verify-interval" || key == "verify_interval" ||
              key == "checksum-interval" || key == "checksum_interval") cfg.verify_interval = ToU32(value);
+    else if (key == "success-log-interval" || key == "success_log_interval") cfg.success_log_interval = ToU32(value);
     else if (key == "golden-checksum" || key == "golden_checksum") cfg.golden_checksum = value;
     else if (key == "fail-fast" || key == "fail_fast") ApplyBool(cfg.fail_fast, value);
     else if (key == "generate-golden" || key == "generate_golden") ApplyBool(cfg.generate_golden, value);
@@ -158,29 +160,37 @@ bool LoadConfigFile(const std::string& path, WorkloadConfig& cfg, std::string& e
     std::ostringstream buffer;
     buffer << input.rdbuf();
     const std::string text = buffer.str();
-    const std::regex key_value(
-        "\"([A-Za-z0-9_\\-]+)\"\\s*:\\s*"
-        "(\"([^\"]*)\"|true|false|null|-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)");
-    try {
-        for (auto it = std::sregex_iterator(text.begin(), text.end(), key_value);
-             it != std::sregex_iterator(); ++it) {
-            const std::string key = (*it)[1].str();
-            const std::string raw = (*it)[2].str();
-            std::string value = raw;
-            if (raw.size() >= 2 && raw.front() == '"' && raw.back() == '"') {
-                value = raw.substr(1, raw.size() - 2);
-            } else if (raw == "null") {
-                value.clear();
-            }
-            if (!ApplyKeyValue(cfg, key, value)) {
-                error = "unknown key in config file '" + path + "': " + key;
-                return false;
-            }
-        }
-    } catch (const std::exception& exception) {
-        error = "failed to parse config file '" + path + "': " + exception.what();
+    JsonValue document;
+    if (!ParseJson(text, document, error) || document.GetType() != JsonValue::Type::Object) {
+        error = "config must be a JSON object: " + error;
         return false;
     }
+    const auto& fields = document.AsObject();
+    for (const auto& pair : {std::make_pair("duration", "duration_s"),
+             std::make_pair("timeout", "timeout_s"), std::make_pair("model", "model_path"),
+             std::make_pair("verify_interval", "checksum_interval"),
+             std::make_pair("heartbeat_interval", "heartbeat_interval_s")}) {
+        if (fields.count(pair.first) && fields.count(pair.second)) {
+            error = "conflicting config aliases"; return false;
+        }
+    }
+    try {
+        for (const auto& entry : fields) {
+            const std::string& key = entry.first;
+            const JsonValue& item = entry.second;
+            if (key.find('-') != std::string::npos) { error = "JSON keys must use underscores"; return false; }
+            bool is_bool = false;
+            const bool is_string = key == "profile" || key == "api" || key == "mode" || key == "backend" ||
+                key == "model" || key == "model_path" || key == "input_manifest" || key == "runtime_library" ||
+                key == "delegate_library" || key == "delegate_options" || key == "golden_checksum" ||
+                key == "verify_mode" || key == "output_format" || key == "output";
+            is_bool = key == "fail_fast" || key == "generate_golden" || key == "summary_only" || key == "per_inference_log";
+            const auto expected = is_string ? JsonValue::Type::String : is_bool ? JsonValue::Type::Boolean : JsonValue::Type::Number;
+            if (item.GetType() != expected) { error = "invalid config type for " + key; return false; }
+            const std::string value = is_bool ? (item.AsBoolean() ? "true" : "false") : item.AsText();
+            if (!ApplyKeyValue(cfg, key, value)) { error = "unknown config key: " + key; return false; }
+        }
+    } catch (const std::exception& exception) { error = exception.what(); return false; }
     return true;
 }
 
@@ -197,7 +207,8 @@ bool ValidateConfig(const WorkloadConfig& cfg, std::string& error) {
         error = "duration or inferences must specify a positive stop condition";
         return false;
     }
-    if (cfg.timeout_s <= 0.0 || cfg.inference_timeout_ms == 0) {
+    if (!std::isfinite(cfg.duration_s) || cfg.duration_s < 0 || !std::isfinite(cfg.heartbeat_interval_s) || cfg.heartbeat_interval_s <= 0) { error = "duration must be nonnegative and heartbeat positive"; return false; }
+    if (!std::isfinite(cfg.timeout_s) || cfg.timeout_s <= 0.0 || cfg.inference_timeout_ms == 0) {
         error = "timeout and inference-timeout-ms must be positive";
         return false;
     }
@@ -228,7 +239,11 @@ bool ParseCommandLine(int argc, char** argv, WorkloadConfig& cfg, std::string& e
     if (!error.empty()) return false;
     if (cli.count("--help") || cli.count("-h")) { cfg.show_help = true; return true; }
     if (cli.count("--version")) { cfg.show_version = true; return true; }
+    if (cli.count("--capabilities")) { cfg.capabilities = true; return true; }
 
+    if (cli.count("--verify-interval") && cli.count("--checksum-interval")) {
+        error = "conflicting verification interval aliases"; return false;
+    }
     const bool list_profiles = cli.count("--list-profiles") != 0;
     const bool dump_config = cli.count("--dump-effective-config") != 0;
     const std::string config_path = cli.count("--config") ? cli.at("--config") : "";
@@ -285,6 +300,7 @@ void DumpEffectiveConfig(const WorkloadConfig& cfg) {
               << ",\"seed\":" << cfg.seed
               << ",\"verify_mode\":\"" << JsonEscape(cfg.verify_mode)
               << "\",\"verify_interval\":" << cfg.verify_interval
+              << ",\"success_log_interval\":" << cfg.success_log_interval
               << ",\"heartbeat_interval_s\":" << cfg.heartbeat_interval_s
               << ",\"summary_only\":" << (cfg.summary_only ? "true" : "false")
               << ",\"per_inference_log\":" << (cfg.per_inference_log ? "true" : "false")
@@ -318,6 +334,7 @@ Runtime:
 Verification and output:
   --verify-mode <none|checksum|crc>
   --verify-interval <count>
+  --success-log-interval <count>   Successful-check sampling; 0 disables; >=1s between logs
   --golden-checksum <hex>
   --generate-golden[ <bool>]
   --heartbeat-interval <sec>
@@ -325,10 +342,10 @@ Verification and output:
   --summary-only[ <bool>]
   --per-inference-log[ <bool>]
 
-Utility: --list-profiles --dump-effective-config --help --version
+Utility: --capabilities --list-profiles --dump-effective-config --help --version
 )";
 }
 
-void PrintVersion() { std::cout << "npu-avs-workload 0.3.0\n"; }
+void PrintVersion() { std::cout << "npu-avs-workload 0.4.0\n"; }
 
 } // namespace npu_avs

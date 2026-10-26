@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(npu_avs_workload VERSION 0.3.0 LANGUAGES CXX)
+project(npu_avs_workload VERSION 0.4.0 LANGUAGES CXX)
 
 option(NPU_AVS_STATIC_CXX_RUNTIME "Link the compiler C++ runtime statically when supported" ON)
 

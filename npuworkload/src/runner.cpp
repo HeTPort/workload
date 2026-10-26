@@ -1,4 +1,5 @@
 #include "npu_avs/runner.h"
+#include "avs/verify_schedule.h"
 
 #include "npu_avs/backend.h"
 #include "npu_avs/heartbeat.h"
@@ -256,10 +257,8 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
         summary.prepare_time_ms = prepare_time_ms;
         summary.first_inference_time_ms = host_ms;
         summary.actual_warmup_inferences = completed_warmup;
-        summary.inference_count = 1;
-        summary.operation_count = result.operation_count;
-        summary.host_time = MetricsCollector::ComputeStats({host_ms});
-        if (result.device_time_valid) summary.device_time = MetricsCollector::ComputeStats({result.device_time_ms});
+        summary.inference_count = 0; // Golden generation is not measured work.
+        summary.operation_count = 0;
         summary.checksum = checksum;
         summary.golden_checksum = checksum;
         logger.EmitSummary(summary);
@@ -272,6 +271,8 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
     uint64_t inference_count = 0;
     uint64_t operation_count = 0;
     uint64_t verify_fail_count = 0;
+    uint64_t verify_count = 0;
+    uint64_t successful_verify_count = 0;
     uint64_t backend_error_count = 0;
     int64_t first_fail_inference = -1;
     double first_inference_time_ms = 0.0;
@@ -333,9 +334,13 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
             inference_count % cfg.verify_interval == 0) {
             const VerifyResult verification = verifier.Verify(inference.outputs, inference_count);
             last_golden = verification.golden_checksum;
-            logger.EmitVerify({verification.inference, verification.verify_mode,
-                verification.checksum, verification.golden_checksum, verification.pass,
-                verification.mismatch_count, verification.message});
+            ++verify_count;
+            if (verification.pass) ++successful_verify_count;
+            if (!verification.pass || avs::ShouldLogSuccessfulVerify(successful_verify_count, cfg.success_log_interval)) {
+                logger.EmitVerify({verification.inference, verification.verify_mode,
+                    verification.checksum, verification.golden_checksum, verification.pass,
+                    verification.mismatch_count, verification.message});
+            }
             if (!verification.pass) {
                 ++verify_fail_count;
                 if (first_fail_inference < 0) first_fail_inference = static_cast<int64_t>(inference_count);
@@ -377,6 +382,7 @@ ResultCode RunWorkload(const WorkloadConfig& cfg) {
     }
     summary.verify_pass = verify_fail_count == 0 && final_result == ResultCode::PASS;
     summary.verify_fail_count = verify_fail_count;
+    summary.verify_count = verify_count;
     summary.first_fail_inference = first_fail_inference;
     summary.checksum = last_checksum;
     summary.golden_checksum = last_golden.empty() ? cfg.golden_checksum : last_golden;

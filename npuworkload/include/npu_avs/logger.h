@@ -1,6 +1,7 @@
 #pragma once
 
 #include "npu_avs/backend.h"
+#include "avs/verify_schedule.h"
 #include "npu_avs/config.h"
 #include "npu_avs/metrics.h"
 #include "npu_avs/result.h"
@@ -54,6 +55,7 @@ struct SummaryData {
     StatSummary throughput;
 
     bool verify_pass = true;
+    uint64_t verify_count = 0;
     uint64_t verify_fail_count = 0;
     int64_t first_fail_inference = -1;
     std::string checksum;
@@ -96,6 +98,7 @@ private:
     std::ostream* out_ = nullptr;
     mutable std::mutex mutex_;
     uint64_t last_heartbeat_time_ms_ = 0;
+    avs::SuccessLogRateLimit success_log_rate_limit_;
 };
 
 } // namespace npu_avs
