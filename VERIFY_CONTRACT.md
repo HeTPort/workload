@@ -14,4 +14,4 @@ verify_interval 选择实际检查点；成功日志采样不会减少检查。s
 
 预热不是正式测量；golden 生成必须从持续性能样本中隔离。NPU 将生成阶段的 inference_count/verify_count 设为零；CPU/GPU 继续通过现有生成流程与校准样本分离，不能把生成摘要当持续测量。无外部 golden 的一致性和完整独立正确性分别表述；null/fake 不代表真实硬件执行。
 
-三类 `include/avs/verify_schedule.h` 使用一致内容，`.gitattributes` 明确 LF，防止 Windows 换行造成字节哈希误差。契约测试和编译产物实际运行测试分别位于 tests/test_verify_contract.ps1、tests/test_runtime_contract.ps1，以及 npuworkload/tests/test_monitor_contract.py。
+三类 `include/avs/verify_schedule.h` 使用一致内容，统一采用 LF 换行，防止不同系统换行造成字节哈希误差。契约测试和编译产物实际运行测试分别位于 tests/test_verify_contract.ps1、tests/test_runtime_contract.ps1，以及 npuworkload/tests/test_monitor_contract.py。

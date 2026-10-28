@@ -1,11 +1,9 @@
-# CPU GPU NPU 中文资料
+# 压力负载中文说明
 
-三类负载已统一在当前源码树；集中入口为根目录 build.ps1/build.sh。
+- [编译指南](编译指南.md)：集中编译及原 Monitor 打包方式。
+- [设计指南](设计指南.md)：执行模型和公共接口。
+- [Monitor 使用指南](../../../npu-monitor/docs/zh/使用指南.md)：可执行文件完整流程。
+- [用例原理](../../../npu-monitor/docs/zh/用例原理详解.md)：算法与本地源码。
+- [压测与日志交接](../../../npu-monitor/docs/zh/压测与日志交接.md)：压测记录与证据要求。
 
-- [编译指南](编译指南.md)
-- [设计指南](设计指南.md)
-- [Monitor 交接资料](../../../npu-monitor/docs/zh/README.md)（按同级 npu-monitor/npu-workload 布局）
-- [用例原理与完整配置表](../../../npu-monitor/docs/zh/用例总表.md)
-- [七天压测和日志要求](../../../npu-monitor/docs/zh/七天压测与日志交接.md)
-
-CPU/GPU 校验分支来自 GitHub 5d6aca9，NPU 基线来自 ccf431f，NPU 协议增强为 8551028。交接时以实际 git 提交和 build-manifest.json 为准。原有英文文档作为历史实现资料保留，中文交接手册为本次操作入口。
+CPU/GPU/NPU 共用操作流程和校验语义；按板卡及实际后端选择配置。

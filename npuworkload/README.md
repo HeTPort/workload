@@ -9,7 +9,7 @@ NPU 负载反复调用固定模型，提供运行生命周期、实际校验计�
 | ad01 | 异常检测 | [1,640] | [1,640] |
 | sww01 | 唤醒词单窗口 | [1,30,1,40] | [1,3] |
 
-模型和输入固定自 MLCommons Tiny 提交 4addd0fa08d216e20637637874e084895f289da4，来源/许可见 third_party/mlcommons-tiny。输入处于模型张量边界，不包含实时采音、图像解码或完整应用链路。
+模型和输入来自 MLCommons Tiny，具体文件以资产哈希识别，来源/许可见 third_party/mlcommons-tiny。输入处于模型张量边界，不包含实时采音、图像解码或完整应用链路。
 
 从仓库根目录使用集中编译：
 
@@ -21,7 +21,7 @@ Linux 使用 `sh build.sh --components npu --target host --engine direct --test`
 
 null 验证资产和框架，reference_cpu 只用于 framework_smoke 夹具。真实模型用 tflite_delegate，并要求 --runtime-library 与 --delegate-library（和可选 --delegate-options）。动态加载、创建、张量分配或调用失败时停止，不自动去掉 delegate 重试。但 delegate 自身可能仅接管部分算子，完整 NPU 执行须由厂商诊断确认。
 
-`--capabilities` 无需初始化后端，输出 verification contract 2、支持模型/后端和成功日志上限。verify_interval 控制真实校验次数；success_log_interval 控制成功事件采样（0 关闭），并限制最多每秒一条；失败立即输出 pass=false/result=FAIL。预热和 golden 生成不进入正式 inference_count/verify_count。配置使用严格 JSON，拒绝重复键、非法类型和冲突别名。
+`--capabilities` 无需初始化后端，输出 校验能力声明、支持模型/后端和成功日志上限。verify_interval 控制真实校验次数；success_log_interval 控制成功事件采样（0 关闭），并限制最多每秒一条；失败立即输出 pass=false/result=FAIL。预热和 golden 生成不进入正式 inference_count/verify_count。配置使用严格 JSON，拒绝重复键、非法类型和冲突别名。
 
 额外原生协议测试：
 

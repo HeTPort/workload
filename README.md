@@ -1,6 +1,6 @@
 # CPU GPU NPU 压力负载
 
-本仓库统一维护 CPU、GPU、NPU 三类负载。CPU/GPU 的校验协议 v2 与 NPU 集成代码已经在本开发分支合并，原始分支历史保留。统一编译入口为根目录 build.ps1 和 build.sh；详细说明见 docs/zh/编译指南.md。
+本工具统一提供 CPU、GPU、NPU 三类负载及一致的校验接口。统一编译入口为根目录 build.ps1 和 build.sh；详细说明见 docs/zh/编译指南.md。
 
 - CPU：整数、浮点、矩阵、内存、混合及占空比负载。
 - GPU：null、GLES、Vulkan、OpenCL，具体可用后端由构建选项和设备驱动决定。
